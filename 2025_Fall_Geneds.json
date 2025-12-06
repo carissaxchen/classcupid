@@ -1,0 +1,302 @@
+{
+  "courses": [
+
+    {
+      "courseTitle": "Global Japanese Cinema",
+      "instructors": ["Alexander Zahlten"],
+      "genEdCode": "GENED 1145",
+      "semester": "Fall 2025",
+      "meetingTimes": "Mon & Wed, 10:30–11:45 AM",
+      "categories": ["Aesthetics & Culture"]
+    },
+    {
+      "courseTitle": "Painting’s Doubt: A Studio Course",
+      "instructors": ["Matt Saunders"],
+      "genEdCode": "GENED 1114",
+      "semester": "Fall 2025",
+      "meetingTimes": "Thu, 1:30–2:45 PM",
+      "categories": ["Aesthetics & Culture"]
+    },
+    {
+      "courseTitle": "Texts in Transition",
+      "instructors": ["Ann Blair", "Leah Whittington"],
+      "genEdCode": "GENED 1034",
+      "semester": "Fall 2025",
+      "meetingTimes": "Mon & Wed, 3:00–4:15 PM",
+      "categories": ["Histories, Societies, Individuals", "Aesthetics & Culture"]
+    },
+    {
+      "courseTitle": "The Age of Anxiety: Histories, Theories, Remedies",
+      "instructors": ["Beth Blum"],
+      "genEdCode": "GENED 1186",
+      "semester": "Fall 2025",
+      "meetingTimes": "Mon & Wed, 10:30–11:45 AM",
+      "categories": ["Aesthetics & Culture"]
+    },
+    {
+      "courseTitle": "The Ancient Greek Hero",
+      "instructors": ["Gregory Nagy"],
+      "genEdCode": "GENED 1074",
+      "semester": "Fall 2025",
+      "meetingTimes": "Mon & Wed, 12:00–1:15 PM",
+      "categories": ["Aesthetics & Culture"]
+    },
+    {
+      "courseTitle": "The Power and Beauty of Being In-Between: The Story of Armenia",
+      "instructors": ["Christina Maranci"],
+      "genEdCode": "GENED 1185",
+      "semester": "Fall 2025",
+      "meetingTimes": "Tue & Thu, 10:30–11:45 AM",
+      "categories": ["Aesthetics & Culture"]
+    },
+    {
+      "courseTitle": "Tradition in Everyday Life",
+      "instructors": ["Sarah Craycraft"],
+      "genEdCode": "GENED 1196",
+      "semester": "Fall 2025",
+      "meetingTimes": "Mon & Wed, 1:30–2:45 PM",
+      "categories": ["Aesthetics & Culture"]
+    },
+
+    {
+      "courseTitle": "Classical Chinese Ethical and Political Theory",
+      "instructors": ["Michael Puett"],
+      "genEdCode": "GENED 1091",
+      "semester": "Fall 2025",
+      "meetingTimes": "Mon & Wed, 12:00–1:15 PM",
+      "categories": ["Ethics & Civics"]
+    },
+    {
+      "courseTitle": "Happiness",
+      "instructors": ["Susanna Rinard"],
+      "genEdCode": "GENED 1025",
+      "semester": "Fall 2025",
+      "meetingTimes": "Tue & Thu, 1:30–2:45 PM",
+      "categories": ["Ethics & Civics"]
+    },
+    {
+      "courseTitle": "Life and Death in the Anthropocene",
+      "instructors": ["Naomi Oreskes"],
+      "genEdCode": "GENED 1174",
+      "semester": "Fall 2025",
+      "meetingTimes": "Mon & Wed, 1:30–2:45 PM",
+      "categories": ["Ethics & Civics"]
+    },
+    {
+      "courseTitle": "Making Change When Change Is Hard",
+      "instructors": ["Cass Sunstein"],
+      "genEdCode": "GENED 1102",
+      "semester": "Fall 2025",
+      "meetingTimes": "Mon, 12:45–2:45 PM",
+      "categories": ["Ethics & Civics"]
+    },
+    {
+      "courseTitle": "Moral Inquiry in the Novels of Tolstoy and Dostoevsky",
+      "instructors": ["Justin Weir"],
+      "genEdCode": "GENED 1059",
+      "semester": "Fall 2025",
+      "meetingTimes": "Tue & Thu, 10:30–11:45 AM",
+      "categories": ["Ethics & Civics"]
+    },
+    {
+      "courseTitle": "The Political Economy of Globalization",
+      "instructors": ["Lawrence Summers", "Robert Lawrence"],
+      "genEdCode": "GENED 1120",
+      "semester": "Fall 2025",
+      "meetingTimes": "Tue & Thu, 10:30–11:45 AM",
+      "categories": ["Ethics & Civics", "Histories, Societies, Individuals"]
+    },
+
+    {
+      "courseTitle": "American Food: A Global History",
+      "instructors": ["Joyce Chaplin"],
+      "genEdCode": "GENED 1147",
+      "semester": "Fall 2025",
+      "meetingTimes": "Mon & Wed, 12:00–1:15 PM",
+      "categories": ["Histories, Societies, Individuals"]
+    },
+    {
+      "courseTitle": "American Society and Public Policy",
+      "instructors": ["Theda Skocpol", "Mary Waters"],
+      "genEdCode": "GENED 1092",
+      "semester": "Fall 2025",
+      "meetingTimes": "Mon & Wed, 10:30–11:45 AM",
+      "categories": ["Histories, Societies, Individuals"]
+    },
+    {
+      "courseTitle": "Ancient Global Economies",
+      "instructors": ["Irene Soto Marin"],
+      "genEdCode": "GENED 1198",
+      "semester": "Fall 2025",
+      "meetingTimes": "Tue & Thu, 10:30–11:45 AM",
+      "categories": ["Histories, Societies, Individuals"]
+    },
+    {
+      "courseTitle": "Can We Know Our Past?",
+      "instructors": ["Jason Ur", "Rowan Flad"],
+      "genEdCode": "GENED 1105",
+      "semester": "Fall 2025",
+      "meetingTimes": "Mon & Wed, 10:30–11:45 AM",
+      "categories": ["Science & Technology in Society", "Histories, Societies, Individuals"]
+    },
+    {
+      "courseTitle": "How the Germans Embraced Hitler",
+      "instructors": ["David Spreen"],
+      "genEdCode": "GENED 1203",
+      "semester": "Fall 2025",
+      "meetingTimes": "Tue & Thu, 10:30–11:45 AM",
+      "categories": ["Histories, Societies, Individuals"]
+    },
+    {
+      "courseTitle": "Mexico’s Culinary Roots",
+      "instructors": ["Jennifer Carballo"],
+      "genEdCode": "GENED 1178",
+      "semester": "Fall 2025",
+      "meetingTimes": "Tue & Thu, 12:00–1:15 PM",
+      "categories": ["Histories, Societies, Individuals"]
+    },
+    {
+      "courseTitle": "Power and Civilization: China",
+      "instructors": ["William C. Kirby", "Peter K. Bol"],
+      "genEdCode": "GENED 1136",
+      "semester": "Fall 2025",
+      "meetingTimes": "Mon & Wed, 10:30–11:45 AM",
+      "categories": ["Histories, Societies, Individuals"]
+    },
+    {
+      "courseTitle": "Race in a Polarized America",
+      "instructors": ["Jennifer L. Hochschild"],
+      "genEdCode": "GENED 1052",
+      "semester": "Fall 2025",
+      "meetingTimes": "Tue & Thu, 12:00–1:15 PM",
+      "categories": ["Histories, Societies, Individuals"]
+    },
+    {
+      "courseTitle": "The Border: Race, Politics and Health in Modern Mexico",
+      "instructors": ["Gabriela Soto Laveaga"],
+      "genEdCode": "GENED 1089",
+      "semester": "Fall 2025",
+      "meetingTimes": "Tue & Thu, 10:30–11:45 AM",
+      "categories": ["Histories, Societies, Individuals"]
+    },
+    {
+      "courseTitle": "The Caribbean Crucible",
+      "instructors": ["Orlando Patterson"],
+      "genEdCode": "GENED 1019",
+      "semester": "Fall 2025",
+      "meetingTimes": "Mon & Wed, 1:30–2:45 PM",
+      "categories": ["Histories, Societies, Individuals"]
+    },
+
+    {
+      "courseTitle": "Finding Our Way",
+      "instructors": ["John Huth"],
+      "genEdCode": "GENED 1031",
+      "semester": "Fall 2025",
+      "meetingTimes": "Mon & Wed, 10:30–11:45 AM",
+      "categories": ["Science & Technology in Society"]
+    },
+    {
+      "courseTitle": "Human Nature",
+      "instructors": ["Joseph Henrich"],
+      "genEdCode": "GENED 1056",
+      "semester": "Fall 2025",
+      "meetingTimes": "Mon & Wed, 12:00–1:15 PM",
+      "categories": ["Science & Technology in Society"]
+    },
+    {
+      "courseTitle": "Learning and Unlearning",
+      "instructors": ["Liao Cheng"],
+      "genEdCode": "GENED 1199",
+      "semester": "Fall 2025",
+      "meetingTimes": "Tue, 12:45–2:45 PM",
+      "categories": ["Science & Technology in Society"]
+    },
+    {
+      "courseTitle": "Natural Disasters",
+      "instructors": ["Brendan Meade"],
+      "genEdCode": "GENED 1098",
+      "semester": "Fall 2025",
+      "meetingTimes": "Tue & Thu, 10:30–11:45 AM",
+      "categories": ["Science & Technology in Society"]
+    },
+    {
+      "courseTitle": "Science and Cooking",
+      "instructors": ["David Weitz", "Pia Sorensen"],
+      "genEdCode": "GENED 1104",
+      "semester": "Fall 2025",
+      "meetingTimes": "Tue & Thu, 12:00–1:15 PM",
+      "categories": ["Science & Technology in Society"]
+    },
+    {
+      "courseTitle": "The Global Heart Disease Epidemic",
+      "instructors": ["Richard Lee"],
+      "genEdCode": "GENED 1053",
+      "semester": "Fall 2025",
+      "meetingTimes": "Mon & Wed, 9:00–10:15 AM",
+      "categories": ["Science & Technology in Society"]
+    },
+    {
+      "courseTitle": "Who Lives, Who Dies: Reimagining Global Health",
+      "instructors": ["Lindsey Zeve", "Jason Silverstein", "Salmaan Keshavjee"],
+      "genEdCode": "GENED 1093",
+      "semester": "Fall 2025",
+      "meetingTimes": "Tue & Thu, 10:30–11:45 AM",
+      "categories": ["Science & Technology in Society"]
+    },
+    {
+      "courseTitle": "Why Is There No Cure for Health?",
+      "instructors": ["David M. Cutler"],
+      "genEdCode": "GENED 1079",
+      "semester": "Fall 2025",
+      "meetingTimes": "Tue & Thu, 12:00–1:15 PM",
+      "categories": ["Science & Technology in Society"]
+    }
+
+  ],
+
+  "categories": {
+    "Aesthetics & Culture": [
+      "Global Japanese Cinema",
+      "Painting’s Doubt: A Studio Course",
+      "Texts in Transition",
+      "The Age of Anxiety",
+      "The Ancient Greek Hero",
+      "The Power and Beauty of Being In-Between",
+      "Tradition in Everyday Life"
+    ],
+    "Ethics & Civics": [
+      "Classical Chinese Ethical and Political Theory",
+      "Happiness",
+      "Life and Death in the Anthropocene",
+      "Making Change When Change Is Hard",
+      "Moral Inquiry in the Novels of Tolstoy and Dostoevsky",
+      "The Political Economy of Globalization"
+    ],
+    "Histories, Societies, Individuals": [
+      "American Food: A Global History",
+      "American Society and Public Policy",
+      "Ancient Global Economies",
+      "Can We Know Our Past?",
+      "How the Germans Embraced Hitler",
+      "Mexico’s Culinary Roots",
+      "Power and Civilization: China",
+      "Race in a Polarized America",
+      "Texts in Transition",
+      "The Border: Race, Politics and Health in Modern Mexico",
+      "The Caribbean Crucible",
+      "The Political Economy of Globalization"
+    ],
+    "Science & Technology in Society": [
+      "Can We Know Our Past?",
+      "Finding Our Way",
+      "Human Nature",
+      "Learning and Unlearning",
+      "Natural Disasters",
+      "Science and Cooking",
+      "The Global Heart Disease Epidemic",
+      "Who Lives, Who Dies",
+      "Why Is There No Cure for Health?"
+    ]
+  }
+}

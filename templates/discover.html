@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Discover - Class Cupid{% endblock %}
+
+{% block content %}
+<div class="discover-container">
+    {% if message %}
+        <div class="no-courses-message">
+            <h2>{{ message }}</h2>
+            {% if prompt_type == "matches" %}
+                <p>You've seen all relevant courses matching your preferences!</p>
+                <p>You have <strong>{{ saved_count }}</strong> saved course{{ 's' if saved_count != 1 else '' }}. 
+                   Head over to your <a href="{{ url_for('matches') }}">matches</a> to start sorting them!</p>
+            {% elif prompt_type == "profile" %}
+                <p>To see more courses, update your profile to include more subjects or requirements.</p>
+                <p><a href="{{ url_for('profile') }}" class="btn btn-primary">Update Profile</a></p>
+                <p>Or check your <a href="{{ url_for('matches') }}">matches</a> if you have any saved courses.</p>
+            {% else %}
+                <p>You've seen all available courses! Check your <a href="{{ url_for('matches') }}">matches</a> or reset your preferences.</p>
+            {% endif %}
+        </div>
+    {% elif course %}
+        <div class="course-card">
+            <div class="course-header-bar">
+                <span class="course-number">{{ course.course_number }}</span>
+            </div>
+            
+            <div class="course-title-section">
+                <h2 class="course-title">{{ course.course_title }}</h2>
+                <p class="course-instructor">{{ course.instructor_name or "TBA" }}</p>
+                <a href="{{ course.course_url }}" target="_blank" class="course-link">View official course page →</a>
+            </div>
+            
+            <div class="course-content">
+                <div class="course-description">
+                    <h3>Course Description</h3>
+                    <div class="description-text">
+                        {{ course.description|safe if course.description else "No description available." }}
+                    </div>
+                </div>
+                
+                <div class="course-metadata">
+                    <h3>Course details</h3>
+                    <div class="metadata-item">
+                        <strong>Term:</strong> {{ course.term_description }}
+                    </div>
+                    <div class="metadata-item">
+                        <strong>Department:</strong> {{ course.department }}
+                    </div>
+                    <div class="metadata-item">
+                        <strong>Time:</strong> 
+                        {% if course.start_time and course.end_time %}
+                            {{ course.start_time }} – {{ course.end_time }}
+                        {% else %}
+                            TBA
+                        {% endif %}
+                    </div>
+                    <div class="metadata-item">
+                        <strong>Days:</strong>
+                        <div class="days-display">
+                            {% set days_map = {'Su': 'Su', 'M': 'M', 'T': 'T', 'W': 'W', 'Th': 'Th', 'F': 'F', 'S': 'S'} %}
+                            {% set course_days = course.get_days_display() %}
+                            <span class="day {% if course.has_day('Su') %}active{% endif %}">Su</span>
+                            <span class="day {% if course.has_day('M') %}active{% endif %}">M</span>
+                            <span class="day {% if course.has_day('T') %}active{% endif %}">T</span>
+                            <span class="day {% if course.has_day('W') %}active{% endif %}">W</span>
+                            <span class="day {% if course.has_day('Th') %}active{% endif %}">Th</span>
+                            <span class="day {% if course.has_day('F') %}active{% endif %}">F</span>
+                            <span class="day {% if course.has_day('S') %}active{% endif %}">S</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {% if quotes %}
+            <div class="quotes-section">
+                <h3>What Students Have to Say</h3>
+                <div class="quotes-grid">
+                    {% for quote in quotes %}
+                        <div class="quote-item">
+                            <p>"{{ quote }}"</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="course-actions">
+                <div class="actions-row">
+                    <form method="POST" action="{{ url_for('discover_undo') }}" class="action-form">
+                        <button type="submit" class="action-btn undo-btn small-btn">
+                            <span class="icon">←</span>
+                        </button>
+                    </form>
+                    
+                    <form method="POST" action="{{ url_for('swipe') }}" class="action-form">
+                        <input type="hidden" name="course_id" value="{{ course.id }}">
+                        <button type="submit" name="action" value="discard" class="action-btn discard-btn">
+                            <span class="icon">✕</span>
+                        </button>
+                    </form>
+                    
+                    <form method="POST" action="{{ url_for('swipe') }}" class="action-form">
+                        <input type="hidden" name="course_id" value="{{ course.id }}">
+                        <button type="submit" name="action" value="heart" class="action-btn heart-btn">
+                            <span class="icon">♥</span>
+                        </button>
+                    </form>
+                    
+                    <form method="POST" action="{{ url_for('swipe') }}" class="action-form">
+                        <input type="hidden" name="course_id" value="{{ course.id }}">
+                        <button type="submit" name="action" value="star" class="action-btn star-btn small-btn">
+                            <span class="icon">★</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+

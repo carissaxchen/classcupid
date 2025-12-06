@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - Class Cupid{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="profile-card">
+        <h1>Welcome to Class Cupid!</h1>
+        <p class="profile-subtitle">Answer a few questions so we can tailor your feed!</p>
+        
+        <form method="POST" action="{{ url_for('profile') }}" class="profile-form" id="profileForm">
+            <!-- Term Selection -->
+            <div class="form-section">
+                <h2>Which term would you like to see courses for?</h2>
+                <div class="radio-group">
+                    {% set user_terms = user.get_terms() if user else [] %}
+                    <label class="radio-label">
+                        <input type="checkbox" name="terms" value="2025 Fall" {% if '2025 Fall' in user_terms %}checked{% endif %}>
+                        <span>2025 Fall</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="checkbox" name="terms" value="2026 Spring" {% if '2026 Spring' in user_terms %}checked{% endif %}>
+                        <span>2026 Spring</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Affiliation Selection -->
+            <div class="form-section">
+                <h2>Are you in Harvard College or Other Affiliation?</h2>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="affiliation" value="Harvard College" 
+                               {% if user and user.affiliation == 'Harvard College' %}checked{% endif %}
+                               onchange="toggleAffiliationSections()">
+                        <span>Harvard College</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="affiliation" value="Other" 
+                               {% if user and user.affiliation == 'Other' %}checked{% endif %}
+                               onchange="toggleAffiliationSections()">
+                        <span>Other Affiliation</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Harvard College Section -->
+            <div id="harvard-college-section" class="affiliation-section" 
+                 style="display: {% if user and user.affiliation == 'Harvard College' %}block{% else %}none{% endif %};">
+                
+                <!-- Year Selection -->
+                <div class="form-section">
+                    <h2>What year are you?</h2>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="year" value="Freshman" {% if user and user.year == 'Freshman' %}checked{% endif %}>
+                            <span>Freshman</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="year" value="Sophomore" {% if user and user.year == 'Sophomore' %}checked{% endif %}>
+                            <span>Sophomore</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="year" value="Junior" {% if user and user.year == 'Junior' %}checked{% endif %}>
+                            <span>Junior</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="year" value="Senior" {% if user and user.year == 'Senior' %}checked{% endif %}>
+                            <span>Senior</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Requirements -->
+                <div class="form-section">
+                    <h2>What requirements do you need to fulfill?</h2>
+                    <div class="requirements-grid">
+                        <div class="requirements-column">
+                            <h3>General Education</h3>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="requirements" value="Science & Technology in Society"
+                                       {% if 'Science & Technology in Society' in user_requirements %}checked{% endif %}>
+                                <span>Science & Technology in Society</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="requirements" value="Aesthetics & Culture"
+                                       {% if 'Aesthetics & Culture' in user_requirements %}checked{% endif %}>
+                                <span>Aesthetics & Culture</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="requirements" value="Ethics & Civics"
+                                       {% if 'Ethics & Civics' in user_requirements %}checked{% endif %}>
+                                <span>Ethics & Civics</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="requirements" value="Histories, Societies, Individuals"
+                                       {% if 'Histories, Societies, Individuals' in user_requirements %}checked{% endif %}>
+                                <span>Histories, Societies, Individuals</span>
+                            </label>
+                        </div>
+                        
+                        <div class="requirements-column">
+                            <h3>Divisional Distribution</h3>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="requirements" value="Arts and Humanities"
+                                       {% if 'Arts and Humanities' in user_requirements %}checked{% endif %}>
+                                <span>Arts and Humanities</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="requirements" value="Social Sciences"
+                                       {% if 'Social Sciences' in user_requirements %}checked{% endif %}>
+                                <span>Social Sciences</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="requirements" value="Science and Engineering and Applied Science"
+                                       {% if 'Science and Engineering and Applied Science' in user_requirements %}checked{% endif %}>
+                                <span>Science and Engineering and Applied Science</span>
+                            </label>
+                        </div>
+                        
+                        <div class="requirements-column">
+                            <h3>General</h3>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="requirements" value="Quantitative Reasoning"
+                                       {% if 'Quantitative Reasoning' in user_requirements %}checked{% endif %}>
+                                <span>Quantitative Reasoning</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="requirements" value="Language Requirement"
+                                       {% if 'Language Requirement' in user_requirements %}checked{% endif %}>
+                                <span>Language Requirement</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="requirements" value="First Year Seminar"
+                                       {% if 'First Year Seminar' in user_requirements %}checked{% endif %}>
+                                <span>First Year Seminar</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Concentration Interests -->
+                <div class="form-section">
+                    <h2>What are you interested in concentrating in?</h2>
+                    <label class="checkbox-label select-all-label">
+                        <input type="checkbox" id="select-all-concentrations" onchange="toggleAllConcentrations()">
+                        <span><strong>Select all</strong></span>
+                    </label>
+                    <div class="checkbox-grid">
+                        {% for concentration in harvard_concentrations %}
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="concentrations" value="{{ concentration }}" 
+                                   class="concentration-checkbox"
+                                   {% if concentration in user_concentrations %}checked{% endif %}>
+                            <span>{{ concentration }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Other Affiliation Section -->
+            <div id="other-affiliation-section" class="affiliation-section"
+                 style="display: {% if user and user.affiliation == 'Other' %}block{% else %}none{% endif %};">
+                <div class="form-section">
+                    <h2>Which school(s) or affiliation(s) are you in?</h2>
+                    <div class="checkbox-grid">
+                        {% for school in harvard_schools %}
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="schools" value="{{ school }}" 
+                                   {% if school in user_schools %}checked{% endif %}>
+                            <span>{{ school }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-large">Save Preferences</button>
+        </form>
+        
+        <!-- Reset Section -->
+        <div class="reset-section">
+            <h2>Reset Options</h2>
+            <form method="POST" action="{{ url_for('reset_all') }}" onsubmit="return confirm('Are you sure you want to reset all your choices? This cannot be undone.');">
+                <button type="submit" class="btn btn-danger">Reset all my choices</button>
+            </form>
+            <p class="reset-note">This will clear all your swipes and sorting game results, allowing you to start fresh.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

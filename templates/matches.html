@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block title %}Matches - Class Cupid{% endblock %}
+
+{% block content %}
+<div class="matches-container">
+    <h1>Matches</h1>
+    
+    <!-- Sorting Game Section -->
+    {% if comparison_pair %}
+    <div class="sorting-game-section">
+        <h2>Which do you prefer?</h2>
+        <div class="comparison-cards">
+            <form method="POST" action="{{ url_for('compare') }}" class="card-form">
+                <input type="hidden" name="winner_course_id" value="{{ comparison_pair[0].id }}">
+                <input type="hidden" name="loser_course_id" value="{{ comparison_pair[1].id }}">
+                <div class="comparison-card clickable-card" onclick="this.closest('form').submit();">
+                    <div class="comparison-card-content">
+                        <h3>{{ comparison_pair[0].course_number }}</h3>
+                        <h4>{{ comparison_pair[0].course_title }}</h4>
+                        <p class="instructor">{{ comparison_pair[0].instructor_name or "TBA" }}</p>
+                        <div class="comparison-meta">
+                            <span>{{ comparison_pair[0].term_description }}</span>
+                            <span>{{ comparison_pair[0].department }}</span>
+                            {% if comparison_pair[0].start_time and comparison_pair[0].end_time %}
+                                <span>{{ comparison_pair[0].start_time }} – {{ comparison_pair[0].end_time }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </form>
+            
+            <div class="vs-divider">VS</div>
+            
+            <form method="POST" action="{{ url_for('compare') }}" class="card-form">
+                <input type="hidden" name="winner_course_id" value="{{ comparison_pair[1].id }}">
+                <input type="hidden" name="loser_course_id" value="{{ comparison_pair[0].id }}">
+                <div class="comparison-card clickable-card" onclick="this.closest('form').submit();">
+                    <div class="comparison-card-content">
+                        <h3>{{ comparison_pair[1].course_number }}</h3>
+                        <h4>{{ comparison_pair[1].course_title }}</h4>
+                        <p class="instructor">{{ comparison_pair[1].instructor_name or "TBA" }}</p>
+                        <div class="comparison-meta">
+                            <span>{{ comparison_pair[1].term_description }}</span>
+                            <span>{{ comparison_pair[1].department }}</span>
+                            {% if comparison_pair[1].start_time and comparison_pair[1].end_time %}
+                                <span>{{ comparison_pair[1].start_time }} – {{ comparison_pair[1].end_time }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="comparison-actions">
+            <form method="POST" action="{{ url_for('undo_comparison') }}" class="action-form">
+                <button type="submit" class="btn btn-action">← Undo</button>
+            </form>
+            <form method="POST" action="{{ url_for('too_tough') }}" class="action-form">
+                <input type="hidden" name="course1_id" value="{{ comparison_pair[0].id }}">
+                <input type="hidden" name="course2_id" value="{{ comparison_pair[1].id }}">
+                <button type="submit" class="btn btn-action">Too Tough</button>
+            </form>
+            <form method="POST" action="{{ url_for('skip_comparison') }}" class="action-form">
+                <input type="hidden" name="course1_id" value="{{ comparison_pair[0].id }}">
+                <input type="hidden" name="course2_id" value="{{ comparison_pair[1].id }}">
+                <button type="submit" class="btn btn-action">Skip →</button>
+            </form>
+        </div>
+    </div>
+    {% else %}
+    <div class="no-comparison-message">
+        <p>You need at least 2 saved courses to play the sorting game. Start <a href="{{ url_for('discover') }}">discovering</a> courses!</p>
+    </div>
+    {% endif %}
+    
+    <!-- Ranking Progress Message -->
+    {% if not show_ranked_list and comparison_count > 0 %}
+    <div class="ranking-progress-message">
+        <p>Keep ranking! You've made {{ comparison_count }} comparison{{ 's' if comparison_count != 1 else '' }}. 
+           Make {{ min_comparisons_needed - comparison_count }} more to see your ranked list.</p>
+    </div>
+    {% elif not show_ranked_list and comparison_count == 0 and total_courses >= 2 %}
+    <div class="ranking-progress-message">
+        <p>Start ranking your courses by choosing between pairs above. Make at least {{ min_comparisons_needed }} comparisons to see your ranked list.</p>
+    </div>
+    {% endif %}
+    
+    <!-- Saved Classes Section -->
+    <div class="saved-classes-section">
+        <h2>Saved Classes</h2>
+        
+        {% if show_ranked_list and courses_by_term %}
+            <!-- Show ranked list -->
+            {% for term, prefs in courses_by_term.items() %}
+            <div class="term-group">
+                <h3 class="term-heading">{{ term }}</h3>
+                <table class="saved-classes-table">
+                    <thead>
+                        <tr>
+                            <th>Ranking</th>
+                            <th>Class</th>
+                            <th>Course Name</th>
+                            <th>Instructor</th>
+                            <th>Time</th>
+                            <th>Day</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pref in prefs %}
+                        <tr>
+                            <td class="ranking-cell">
+                                {% if pref.ranking_position %}
+                                    {{ pref.ranking_position }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td>{{ pref.course.course_number }}</td>
+                            <td>
+                                {% if pref.course.course_url %}
+                                    <a href="{{ pref.course.course_url }}" target="_blank" class="course-name-link">{{ pref.course.course_title }}</a>
+                                {% else %}
+                                    {{ pref.course.course_title }}
+                                {% endif %}
+                            </td>
+                            <td>{{ pref.course.instructor_name or "TBA" }}</td>
+                            <td>
+                                {% if pref.course.start_time and pref.course.end_time %}
+                                    {{ pref.course.start_time }} – {{ pref.course.end_time }}
+                                {% else %}
+                                    TBA
+                                {% endif %}
+                            </td>
+                            <td>{{ pref.course.get_days_display() or "TBA" }}</td>
+                            <td class="action-cells">
+                                <form method="POST" action="{{ url_for('update_preference') }}" class="inline-form">
+                                    <input type="hidden" name="course_id" value="{{ pref.course.id }}">
+                                    <button type="submit" name="action" value="star" class="icon-btn star-icon {% if pref.status == 'star' %}active{% endif %}" title="Star">
+                                        ★
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ url_for('update_preference') }}" class="inline-form">
+                                    <input type="hidden" name="course_id" value="{{ pref.course.id }}">
+                                    <button type="submit" name="action" value="heart" class="icon-btn heart-icon {% if pref.status == 'heart' %}active{% endif %}" title="Heart">
+                                        ♥
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ url_for('update_preference') }}" class="inline-form">
+                                    <input type="hidden" name="course_id" value="{{ pref.course.id }}">
+                                    <button type="submit" name="action" value="remove" class="icon-btn remove-btn" title="Remove">
+                                        ✕
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endfor %}
+        {% elif not show_ranked_list and courses_by_term %}
+            <!-- Show unranked list (before ranking) - starred first, then hearted -->
+            <div class="rank-prompt-message">
+                <p>Make at least {{ min_comparisons_needed }} comparisons above to see your ranked list of favorite courses!</p>
+            </div>
+            {% for term, prefs in courses_by_term.items() %}
+            <div class="term-group">
+                <h3 class="term-heading">{{ term }}</h3>
+                <table class="saved-classes-table">
+                    <thead>
+                        <tr>
+                            <th>Class</th>
+                            <th>Course Name</th>
+                            <th>Instructor</th>
+                            <th>Time</th>
+                            <th>Day</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pref in prefs %}
+                        <tr>
+                            <td>{{ pref.course.course_number }}</td>
+                            <td>
+                                {% if pref.course.course_url %}
+                                    <a href="{{ pref.course.course_url }}" target="_blank" class="course-name-link">{{ pref.course.course_title }}</a>
+                                {% else %}
+                                    {{ pref.course.course_title }}
+                                {% endif %}
+                            </td>
+                            <td>{{ pref.course.instructor_name or "TBA" }}</td>
+                            <td>
+                                {% if pref.course.start_time and pref.course.end_time %}
+                                    {{ pref.course.start_time }} – {{ pref.course.end_time }}
+                                {% else %}
+                                    TBA
+                                {% endif %}
+                            </td>
+                            <td>{{ pref.course.get_days_display() or "TBA" }}</td>
+                            <td class="action-cells">
+                                <form method="POST" action="{{ url_for('update_preference') }}" class="inline-form">
+                                    <input type="hidden" name="course_id" value="{{ pref.course.id }}">
+                                    <button type="submit" name="action" value="star" class="icon-btn star-icon {% if pref.status == 'star' %}active{% endif %}" title="Star">
+                                        ★
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ url_for('update_preference') }}" class="inline-form">
+                                    <input type="hidden" name="course_id" value="{{ pref.course.id }}">
+                                    <button type="submit" name="action" value="heart" class="icon-btn heart-icon {% if pref.status == 'heart' %}active{% endif %}" title="Heart">
+                                        ♥
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ url_for('update_preference') }}" class="inline-form">
+                                    <input type="hidden" name="course_id" value="{{ pref.course.id }}">
+                                    <button type="submit" name="action" value="remove" class="icon-btn remove-btn" title="Remove">
+                                        ✕
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p class="no-saved-message">No saved classes yet. Start <a href="{{ url_for('discover') }}">discovering</a> courses!</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
