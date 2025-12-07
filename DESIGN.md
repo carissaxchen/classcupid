@@ -2,7 +2,7 @@
 
 ## Overview
 
-Class Cupid is a Flask-based web application that helps Harvard students discover and rank courses through a Tinder-style discovery interface and a binary search-based comparison game. The system intelligently filters courses based on user preferences (year, concentration, requirements, term) and employs sophisticated algorithms to ensure course recommendations are appropriate and relevant.
+Class Cupid is a Flask-based web application that helps Harvard students discover and rank courses through a dating app-style discovery interface and a binary search-based comparison game. The system intelligently filters courses based on user preferences (year, concentration, requirements, term) and employs sophisticated algorithms to ensure course recommendations are appropriate and relevant.
 
 ## Architecture
 
