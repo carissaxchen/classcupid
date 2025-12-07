@@ -21,6 +21,11 @@ body {
     font-size: 1.1rem;
     color: var(--black);
     line-height: 1.6;
+    background-image: url("../images/ccbackground.jpg");
+    background-repeat: repeat;
+    background-attachment: fixed;
+    background-size: auto;
+    min-height: 100vh;
 }
 
 /* Navigation Bar */
