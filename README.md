@@ -1,6 +1,6 @@
 # Class Cupid
 
-A Tinder-style course selection web app for Harvard students. Discover courses by swiping, save your favorites, and rank them through an interactive comparison game.
+A dating app-style course selection web app for Harvard students. Discover courses by swiping, save your favorites, and rank them through an interactive comparison game.
 
 ## Features
 
@@ -305,7 +305,7 @@ class_cupidv1/
 
 - **QReports Quotes**: Course quotes from QReports can be added by updating the `quotes_json` field in the Course model (requires database access).
 
-- **Font**: The application uses the Inter font family from Google Fonts for consistent typography.
+- **Font**: The application uses the Apple system font family for consistent typography.
 
 - **Session Storage**: User sessions are stored in the `flask_session/` directory as files. You can clear all sessions by deleting files in this directory.
 
