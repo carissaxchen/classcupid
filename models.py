@@ -75,7 +75,7 @@ class Course(db.Model):
     __tablename__ = 'courses'
     
     id = db.Column(db.Integer, primary_key=True)
-    course_id = db.Column(db.String(20), unique=True, nullable=False)  # from courseID
+    course_id = db.Column(db.String(20), nullable=False)  # from courseID (not unique alone - can exist in multiple semesters)
     course_number = db.Column(db.String(50))  # e.g., "COMPSCI 50"
     course_title = db.Column(db.String(500))
     instructor_name = db.Column(db.String(200))  # First instructor or concatenated
@@ -109,6 +109,11 @@ class Course(db.Model):
     user_preferences = db.relationship('UserCoursePreference', backref='course', lazy=True)
     winner_comparisons = db.relationship('SortComparison', foreign_keys='SortComparison.winner_course_id', backref='winner_course', lazy=True)
     loser_comparisons = db.relationship('SortComparison', foreign_keys='SortComparison.loser_course_id', backref='loser_course', lazy=True)
+    
+    # Composite unique constraint: same course can exist in different semesters
+    __table_args__ = (
+        db.UniqueConstraint('course_id', 'term_description', name='unique_course_term'),
+    )
     
     def get_quotes(self):
         """Get quotes as a list"""

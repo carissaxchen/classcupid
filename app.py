@@ -160,6 +160,12 @@ def register():
 def profile():
     """User profile and preferences"""
     user = User.query.get(session["user_id"])
+    
+    # Handle case where user doesn't exist (e.g., after database recreation)
+    if not user:
+        session.clear()
+        flash("Your session has expired. Please log in again.", "error")
+        return redirect("/login")
 
     if request.method == "POST":
         # Get form data
@@ -967,6 +973,12 @@ def discover():
     """Tinder-style course discovery page with weighted recommendation algorithm"""
     user = User.query.get(session["user_id"])
     
+    # Handle case where user doesn't exist (e.g., after database recreation)
+    if not user:
+        session.clear()
+        flash("Your session has expired. Please log in again.", "error")
+        return redirect("/login")
+    
     # Check if user has set preferences
     if not user.affiliation:
         flash("Please set your preferences first!")
@@ -988,6 +1000,17 @@ def discover():
         if not user.school_preferences:
             flash("Please complete your profile preferences first!")
             return redirect("/profile")
+    
+    # Check if we should show a specific course (e.g., after undo)
+    show_course_id = request.args.get("show_course", type=int)
+    if show_course_id:
+        course = Course.query.get(show_course_id)
+        if course:
+            # Verify the course matches user's term preferences
+            if user_terms and course.term_description not in user_terms:
+                course = None  # Course doesn't match term preference, treat as not found
+            if course:
+                return render_template("discover.html", course=course)
     
     # Get courses user has already seen
     seen_course_ids = [p.course_id for p in UserCoursePreference.query.filter_by(user_id=user.id).all()]
@@ -1019,14 +1042,9 @@ def discover():
                                  message="No more courses match your current preferences!",
                                  prompt_type="profile")
     
-    # Get random quotes (1-2)
-    quotes = course.get_quotes()
-    if quotes:
-        selected_quotes = random.sample(quotes, min(2, len(quotes)))
-    else:
-        selected_quotes = []
+   
     
-    return render_template("discover.html", course=course, quotes=selected_quotes)
+    return render_template("discover.html", course=course)
 
 
 @app.route("/swipe", methods=["POST"])
@@ -1070,7 +1088,7 @@ def swipe():
 @app.route("/discover/undo", methods=["POST"])
 @login_required
 def discover_undo():
-    """Undo the last swipe action on discover page"""
+    """Undo the last swipe action on discover page and return to that course"""
     user_id = session["user_id"]
     
     # Get the most recent preference for this user
@@ -1079,9 +1097,13 @@ def discover_undo():
     ).order_by(UserCoursePreference.timestamp.desc()).first()
     
     if last_preference:
+        # Store the course_id before deleting
+        course_id_to_show = last_preference.course_id
         db.session.delete(last_preference)
         db.session.commit()
         flash("Last action undone!")
+        # Redirect to discover showing the course that was just undone
+        return redirect(f"/discover?show_course={course_id_to_show}")
     
     return redirect("/discover")
 
@@ -1093,70 +1115,13 @@ def matches():
     user_id = session["user_id"]
     user = User.query.get(user_id)
     
+    # Handle case where user doesn't exist (e.g., after database recreation)
+    if not user:
+        session.clear()
+        flash("Your session has expired. Please log in again.", "error")
+        return redirect("/login")
+    
     # Get user's liked/starred courses, filtered by term preference
-    liked_courses_query = Course.query.join(UserCoursePreference).filter(
-        and_(
-            UserCoursePreference.user_id == user_id,
-            UserCoursePreference.status.in_(['heart', 'star'])
-        )
-    )
-    
-    # Filter by term preference if set
-    user_terms = user.get_terms()
-    if user_terms:
-        liked_courses_query = liked_courses_query.filter(Course.term_description.in_(user_terms))
-    
-    liked_courses = liked_courses_query.all()
-    
-    # Get two random courses for sorting game
-    comparison_pair = None
-    if len(liked_courses) >= 2:
-        # Get courses that haven't been compared yet
-        compared_pairs = SortComparison.query.filter_by(user_id=user_id).all()
-        compared_set = set()
-        for comp in compared_pairs:
-            compared_set.add((comp.winner_course_id, comp.loser_course_id))
-            compared_set.add((comp.loser_course_id, comp.winner_course_id))
-        
-        # Try to find a pair that hasn't been compared
-        available_pairs = []
-        for i, course1 in enumerate(liked_courses):
-            for course2 in liked_courses[i+1:]:
-                if (course1.id, course2.id) not in compared_set:
-                    available_pairs.append((course1, course2))
-        
-        if available_pairs:
-            comparison_pair = random.choice(available_pairs)
-        else:
-            # All pairs compared, pick any random pair
-            comparison_pair = random.sample(liked_courses, 2)
-    
-    # Get all comparisons for ranking
-    comparisons = SortComparison.query.filter_by(user_id=user_id).all()
-    comparison_count = len(comparisons)
-    
-    # Minimum comparisons needed before showing ranked list
-    # For n courses, we need at least n-1 comparisons for a meaningful ranking
-    total_courses = len(liked_courses)
-    min_comparisons_needed = max(3, min(10, total_courses - 1)) if total_courses > 1 else 0
-    show_ranked_list = comparison_count >= min_comparisons_needed
-    
-    # Compute rankings using binary search algorithm (for internal calculation)
-    rankings = rank_courses_binary_search(liked_courses, comparisons)
-    
-    # Calculate scores (0-10 scale) - used internally only
-    course_scores = calculate_course_scores(rankings, total_courses)
-    
-    # Compute rankings (win count) for backward compatibility
-    course_wins = {}
-    for comp in comparisons:
-        course_wins[comp.winner_course_id] = course_wins.get(comp.winner_course_id, 0) + 1
-        course_wins[comp.loser_course_id] = course_wins.get(comp.loser_course_id, 0) - 1
-    
-    # Sort courses by win count
-    ranked_courses = sorted(liked_courses, key=lambda c: course_wins.get(c.id, 0), reverse=True)
-    
-    # Get saved courses, filtered by term preference
     saved_courses_query = UserCoursePreference.query.filter(
         and_(
             UserCoursePreference.user_id == user_id,
@@ -1171,7 +1136,7 @@ def matches():
     
     saved_courses = saved_courses_query.all()
     
-    # Group by term
+    # Group courses by term
     courses_by_term = {}
     for pref in saved_courses:
         term = pref.course.term_description or "Other"
@@ -1179,36 +1144,131 @@ def matches():
             courses_by_term[term] = []
         courses_by_term[term].append(pref)
     
-    # Sort each term group based on whether rankings are shown
-    if show_ranked_list and rankings:
-        # Use rankings: sort by rank (lower rank = better = higher in list)
-        for term in courses_by_term:
-            courses_by_term[term].sort(key=lambda p: (
-                rankings.get(p.course.id, 999)  # Use ranking, default to 999 if not ranked
+    # Get all comparisons and group by term
+    all_comparisons = SortComparison.query.filter_by(user_id=user_id).all()
+    
+    # Build a map of course_id -> term for quick lookup
+    course_term_map = {}
+    for pref in saved_courses:
+        course_term_map[pref.course.id] = pref.course.term_description or "Other"
+    
+    # Group comparisons by term (both courses must be in same term)
+    comparisons_by_term = {}
+    for comp in all_comparisons:
+        term1 = course_term_map.get(comp.winner_course_id)
+        term2 = course_term_map.get(comp.loser_course_id)
+        # Only include comparisons where both courses are in the same term
+        if term1 and term2 and term1 == term2:
+            if term1 not in comparisons_by_term:
+                comparisons_by_term[term1] = []
+            comparisons_by_term[term1].append(comp)
+    
+    # Calculate rankings separately for each term
+    rankings_by_term = {}
+    show_ranked_list_by_term = {}
+    comparison_count_by_term = {}
+    min_comparisons_by_term = {}
+    
+    for term, prefs in courses_by_term.items():
+        # Get courses for this term
+        term_courses = [pref.course for pref in prefs]
+        
+        # Get comparisons for this term only
+        term_comparisons = comparisons_by_term.get(term, [])
+        comparison_count_by_term[term] = len(term_comparisons)
+        
+        # Minimum comparisons needed for this term
+        total_courses_in_term = len(term_courses)
+        min_comparisons_by_term[term] = max(3, min(10, total_courses_in_term - 1)) if total_courses_in_term > 1 else 0
+        show_ranked_list_by_term[term] = comparison_count_by_term[term] >= min_comparisons_by_term[term]
+        
+        # Calculate rankings for this term only
+        if term_comparisons:
+            rankings_by_term[term] = rank_courses_binary_search(term_courses, term_comparisons)
+        else:
+            rankings_by_term[term] = {}
+    
+    # Select comparison pair - only from the same term
+    comparison_pair = None
+    comparison_term = None
+    
+    # Get all available terms with at least 2 courses
+    available_terms = [term for term, prefs in courses_by_term.items() if len(prefs) >= 2]
+    
+    if available_terms:
+        # Build compared pairs set (by term)
+        compared_pairs_by_term = {}
+        for term in available_terms:
+            compared_pairs_by_term[term] = set()
+            term_comparisons = comparisons_by_term.get(term, [])
+            for comp in term_comparisons:
+                compared_pairs_by_term[term].add((comp.winner_course_id, comp.loser_course_id))
+                compared_pairs_by_term[term].add((comp.loser_course_id, comp.winner_course_id))
+        
+        # Try to find an available pair within a single term
+        available_pairs_by_term = {}
+        for term in available_terms:
+            term_prefs = courses_by_term[term]
+            term_compared = compared_pairs_by_term.get(term, set())
+            available_pairs = []
+            for i, pref1 in enumerate(term_prefs):
+                for pref2 in term_prefs[i+1:]:
+                    if (pref1.course.id, pref2.course.id) not in term_compared:
+                        available_pairs.append((pref1.course, pref2.course))
+            if available_pairs:
+                available_pairs_by_term[term] = available_pairs
+        
+        # Pick a random term with available pairs, or any term if all pairs are compared
+        if available_pairs_by_term:
+            comparison_term = random.choice(list(available_pairs_by_term.keys()))
+            comparison_pair = random.choice(available_pairs_by_term[comparison_term])
+        else:
+            # All pairs compared in all terms, pick any random pair from same term
+            comparison_term = random.choice(available_terms)
+            term_prefs = courses_by_term[comparison_term]
+            comparison_pair = tuple(random.sample([pref.course for pref in term_prefs], 2))
+    
+    # Sort each term group based on whether rankings are shown for that term
+    for term, prefs in courses_by_term.items():
+        show_ranked = show_ranked_list_by_term.get(term, False)
+        term_rankings = rankings_by_term.get(term, {})
+        
+        if show_ranked and term_rankings:
+            # Use rankings: sort by rank (lower rank = better = higher in list)
+            prefs.sort(key=lambda p: (
+                term_rankings.get(p.course.id, 999)  # Use ranking, default to 999 if not ranked
             ))
-            # Create ranking positions (1st, 2nd, etc.)
-            for idx, pref in enumerate(courses_by_term[term]):
-                rank_pos = rankings.get(pref.course.id, None)
+            # Create ranking positions (1-based)
+            for pref in prefs:
+                rank_pos = term_rankings.get(pref.course.id, None)
                 if rank_pos is not None:
                     pref.ranking_position = rank_pos + 1  # Convert 0-based to 1-based
                 else:
                     pref.ranking_position = None
-    else:
-        # Before ranking: starred courses first, then hearted courses
-        for term in courses_by_term:
-            courses_by_term[term].sort(key=lambda p: (0 if p.status == 'star' else 1, p.course.course_number))
+        else:
+            # Before ranking: starred courses first, then hearted courses
+            prefs.sort(key=lambda p: (0 if p.status == 'star' else 1, p.course.course_number))
             # No ranking positions yet
-            for pref in courses_by_term[term]:
+            for pref in prefs:
                 pref.ranking_position = None
+    
+    # Calculate totals across all terms for progress display
+    total_comparison_count = sum(comparison_count_by_term.values())
+    total_courses = sum(len(prefs) for prefs in courses_by_term.values())
+    
+    # Determine if any term has enough comparisons (for general progress message)
+    any_ranked = any(show_ranked_list_by_term.values())
     
     return render_template("matches.html",
                          comparison_pair=comparison_pair,
-                         ranked_courses=ranked_courses[:10],  # Top 10
+                         comparison_term=comparison_term,
                          courses_by_term=courses_by_term,
-                         show_ranked_list=show_ranked_list,
-                         comparison_count=comparison_count,
-                         min_comparisons_needed=min_comparisons_needed,
-                         total_courses=total_courses)
+                         show_ranked_list_by_term=show_ranked_list_by_term,
+                         comparison_count_by_term=comparison_count_by_term,
+                         min_comparisons_by_term=min_comparisons_by_term,
+                         total_comparison_count=total_comparison_count,
+                         total_courses=total_courses,
+                         available_terms=available_terms if 'available_terms' in locals() else [])
 
 
 @app.route("/matches/compare", methods=["POST"])
@@ -1224,6 +1284,18 @@ def compare():
     
     if winner_id == loser_id:
         return apology("courses must be different", 400)
+    
+    # Verify both courses exist and are from the same term
+    winner_course = Course.query.get(winner_id)
+    loser_course = Course.query.get(loser_id)
+    
+    if not winner_course or not loser_course:
+        return apology("invalid course IDs", 400)
+    
+    # Ensure courses are from the same term
+    if winner_course.term_description != loser_course.term_description:
+        flash("You can only compare courses from the same semester.", "error")
+        return redirect("/matches")
     
     # Check if comparison already exists
     existing = SortComparison.query.filter_by(
@@ -1342,8 +1414,14 @@ def import_courses(json_file):
             skipped += 1
             continue
         
-        # Check if course already exists
-        existing = Course.query.filter_by(course_id=str(course_id)).first()
+        # Extract term description early so we can use it for duplicate checking
+        term_description = course_data.get('termDescription', '')
+        
+        # Check if course already exists for this specific term (same course can exist in multiple semesters)
+        existing = Course.query.filter_by(
+            course_id=str(course_id),
+            term_description=term_description
+        ).first()
         
         # Extract instructor name
         instructors = course_data.get('publishedInstructors', [])

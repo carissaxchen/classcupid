@@ -55,11 +55,6 @@
             <form method="POST" action="{{ url_for('undo_comparison') }}" class="action-form">
                 <button type="submit" class="btn btn-action">← Undo</button>
             </form>
-            <form method="POST" action="{{ url_for('too_tough') }}" class="action-form">
-                <input type="hidden" name="course1_id" value="{{ comparison_pair[0].id }}">
-                <input type="hidden" name="course2_id" value="{{ comparison_pair[1].id }}">
-                <button type="submit" class="btn btn-action">Too Tough</button>
-            </form>
             <form method="POST" action="{{ url_for('skip_comparison') }}" class="action-form">
                 <input type="hidden" name="course1_id" value="{{ comparison_pair[0].id }}">
                 <input type="hidden" name="course2_id" value="{{ comparison_pair[1].id }}">
@@ -74,30 +69,49 @@
     {% endif %}
     
     <!-- Ranking Progress Message -->
-    {% if not show_ranked_list and comparison_count > 0 %}
-    <div class="ranking-progress-message">
-        <p>Keep ranking! You've made {{ comparison_count }} comparison{{ 's' if comparison_count != 1 else '' }}. 
-           Make {{ min_comparisons_needed - comparison_count }} more to see your ranked list.</p>
-    </div>
-    {% elif not show_ranked_list and comparison_count == 0 and total_courses >= 2 %}
-    <div class="ranking-progress-message">
-        <p>Start ranking your courses by choosing between pairs above. Make at least {{ min_comparisons_needed }} comparisons to see your ranked list.</p>
-    </div>
+    {% if comparison_pair and comparison_term %}
+        {% set term_count = comparison_count_by_term.get(comparison_term, 0) %}
+        {% set term_min = min_comparisons_by_term.get(comparison_term, 0) %}
+        {% set term_show_ranked = show_ranked_list_by_term.get(comparison_term, False) %}
+        {% if not term_show_ranked and term_count > 0 %}
+        <div class="ranking-progress-message">
+            <p>Keep ranking courses for <strong>{{ comparison_term }}</strong>! You've made {{ term_count }} comparison{{ 's' if term_count != 1 else '' }}. 
+               Make {{ term_min - term_count }} more to see your ranked list for this semester.</p>
+        </div>
+        {% elif not term_show_ranked and term_count == 0 %}
+        <div class="ranking-progress-message">
+            <p>Start ranking your <strong>{{ comparison_term }}</strong> courses by choosing between pairs above. Make at least {{ term_min }} comparisons to see your ranked list for this semester.</p>
+        </div>
+        {% endif %}
     {% endif %}
     
     <!-- Saved Classes Section -->
     <div class="saved-classes-section">
         <h2>Saved Classes</h2>
         
-        {% if show_ranked_list and courses_by_term %}
-            <!-- Show ranked list -->
+        {% if courses_by_term %}
+            <!-- Show courses grouped by term -->
             {% for term, prefs in courses_by_term.items() %}
+            {% set term_show_ranked = show_ranked_list_by_term.get(term, False) %}
+            {% set term_count = comparison_count_by_term.get(term, 0) %}
+            {% set term_min = min_comparisons_by_term.get(term, 0) %}
             <div class="term-group">
                 <h3 class="term-heading">{{ term }}</h3>
+                {% if not term_show_ranked and term_count > 0 %}
+                <div class="term-progress-message">
+                    <p>{{ term_count }}/{{ term_min }} comparisons made for this semester. Keep ranking to see your ranked list!</p>
+                </div>
+                {% elif not term_show_ranked and term_count == 0 and prefs|length >= 2 %}
+                <div class="term-progress-message">
+                    <p>Make at least {{ term_min }} comparisons above to see your ranked list for this semester.</p>
+                </div>
+                {% endif %}
                 <table class="saved-classes-table">
                     <thead>
                         <tr>
+                            {% if term_show_ranked %}
                             <th>Ranking</th>
+                            {% endif %}
                             <th>Class</th>
                             <th>Course Name</th>
                             <th>Instructor</th>
@@ -109,6 +123,7 @@
                     <tbody>
                         {% for pref in prefs %}
                         <tr>
+                            {% if term_show_ranked %}
                             <td class="ranking-cell">
                                 {% if pref.ranking_position %}
                                     {{ pref.ranking_position }}
@@ -116,71 +131,7 @@
                                     —
                                 {% endif %}
                             </td>
-                            <td>{{ pref.course.course_number }}</td>
-                            <td>
-                                {% if pref.course.course_url %}
-                                    <a href="{{ pref.course.course_url }}" target="_blank" class="course-name-link">{{ pref.course.course_title }}</a>
-                                {% else %}
-                                    {{ pref.course.course_title }}
-                                {% endif %}
-                            </td>
-                            <td>{{ pref.course.instructor_name or "TBA" }}</td>
-                            <td>
-                                {% if pref.course.start_time and pref.course.end_time %}
-                                    {{ pref.course.start_time }} – {{ pref.course.end_time }}
-                                {% else %}
-                                    TBA
-                                {% endif %}
-                            </td>
-                            <td>{{ pref.course.get_days_display() or "TBA" }}</td>
-                            <td class="action-cells">
-                                <form method="POST" action="{{ url_for('update_preference') }}" class="inline-form">
-                                    <input type="hidden" name="course_id" value="{{ pref.course.id }}">
-                                    <button type="submit" name="action" value="star" class="icon-btn star-icon {% if pref.status == 'star' %}active{% endif %}" title="Star">
-                                        ★
-                                    </button>
-                                </form>
-                                <form method="POST" action="{{ url_for('update_preference') }}" class="inline-form">
-                                    <input type="hidden" name="course_id" value="{{ pref.course.id }}">
-                                    <button type="submit" name="action" value="heart" class="icon-btn heart-icon {% if pref.status == 'heart' %}active{% endif %}" title="Heart">
-                                        ♥
-                                    </button>
-                                </form>
-                                <form method="POST" action="{{ url_for('update_preference') }}" class="inline-form">
-                                    <input type="hidden" name="course_id" value="{{ pref.course.id }}">
-                                    <button type="submit" name="action" value="remove" class="icon-btn remove-btn" title="Remove">
-                                        ✕
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% endfor %}
-        {% elif not show_ranked_list and courses_by_term %}
-            <!-- Show unranked list (before ranking) - starred first, then hearted -->
-            <div class="rank-prompt-message">
-                <p>Make at least {{ min_comparisons_needed }} comparisons above to see your ranked list of favorite courses!</p>
-            </div>
-            {% for term, prefs in courses_by_term.items() %}
-            <div class="term-group">
-                <h3 class="term-heading">{{ term }}</h3>
-                <table class="saved-classes-table">
-                    <thead>
-                        <tr>
-                            <th>Class</th>
-                            <th>Course Name</th>
-                            <th>Instructor</th>
-                            <th>Time</th>
-                            <th>Day</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for pref in prefs %}
-                        <tr>
+                            {% endif %}
                             <td>{{ pref.course.course_number }}</td>
                             <td>
                                 {% if pref.course.course_url %}
