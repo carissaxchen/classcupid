@@ -1,0 +1,376 @@
+{
+  "courses": [
+
+
+    {
+      "courseTitle": "Creativity",
+      "instructors": ["David Atherton"],
+      "genEdCode": "GENED 1067",
+      "semester": "Spring 2025",
+      "meetingTimes": "Tue & Thu, 12:00–1:15 PM",
+      "categories": ["Aesthetics & Culture"]
+    },
+    {
+      "courseTitle": "East Asian Cinema",
+      "instructors": ["Jie Li"],
+      "genEdCode": "GENED 1049",
+      "semester": "Spring 2025",
+      "meetingTimes": "Wed, 12:45–2:45 PM",
+      "categories": ["Aesthetics & Culture"]
+    },
+    {
+      "courseTitle": "Grimm’s Fairy Tales: Echoes of the Past, Reflections of the Present",
+      "instructors": ["Ekaterina Pirozhenko"],
+      "genEdCode": "GENED 1197",
+      "semester": "Spring 2025",
+      "meetingTimes": "Tue & Thu, 10:30–11:45 AM",
+      "categories": ["Aesthetics & Culture"]
+    },
+    {
+      "courseTitle": "Harvard Gets Medieval",
+      "instructors": ["Daniel Lord Smail"],
+      "genEdCode": "GENED 1160",
+      "semester": "Spring 2025",
+      "meetingTimes": "Mon & Wed, 12:00–1:15 PM",
+      "categories": ["Aesthetics & Culture"]
+    },
+    {
+      "courseTitle": "Language in Culture and Society",
+      "instructors": ["Nicholas Harkness"],
+      "genEdCode": "GENED 1177",
+      "semester": "Spring 2025",
+      "meetingTimes": "Mon & Wed, 10:30–11:45 AM",
+      "categories": ["Aesthetics & Culture"]
+    },
+    {
+      "courseTitle": "Permanent Impermanence: Why Buddhists Build Monuments",
+      "instructors": ["Jinah Kim", "Eugene Wang"],
+      "genEdCode": "GENED 1083",
+      "semester": "Spring 2025",
+      "meetingTimes": "Mon & Wed, 12:00–1:15 PM",
+      "categories": ["Aesthetics & Culture"]
+    },
+    {
+      "courseTitle": "Sexuality in Literature: From Giovanni’s Room to Fun Home",
+      "instructors": ["Linda Schlossberg"],
+      "genEdCode": "GENED 1176",
+      "semester": "Spring 2025",
+      "meetingTimes": "Tue & Thu, 12:00–1:15 PM",
+      "categories": ["Aesthetics & Culture"]
+    },
+    {
+      "courseTitle": "The Power, Art, and Technology of Writing in East Asia",
+      "instructors": ["Thomas Kelly", "Si Nae Park"],
+      "genEdCode": "GENED 1205",
+      "semester": "Spring 2025",
+      "meetingTimes": "Mon & Wed, 1:30–2:45 PM",
+      "categories": ["Aesthetics & Culture"]
+    },
+    {
+      "courseTitle": "Tragedy Today",
+      "instructors": ["Naomi Weiss"],
+      "genEdCode": "GENED 1168",
+      "semester": "Spring 2025",
+      "meetingTimes": "Mon & Wed, 1:30–2:45 PM",
+      "categories": ["Aesthetics & Culture"]
+    },
+    {
+      "courseTitle": "What is a Book? From the Clay Tablet to the Kindle",
+      "instructors": ["David Stern"],
+      "genEdCode": "GENED 1090",
+      "semester": "Spring 2025",
+      "meetingTimes": "Tue & Thu, 1:30–2:45 PM",
+      "categories": ["Aesthetics & Culture"]
+    },
+    {
+      "courseTitle": "What Is the Good China Story?",
+      "instructors": ["David Wang", "Wai-yee Li"],
+      "genEdCode": "GENED 1169",
+      "semester": "Spring 2025",
+      "meetingTimes": "Mon & Wed, 10:30–11:45 AM",
+      "categories": ["Aesthetics & Culture"]
+    },
+
+    {
+      "courseTitle": "Evolving Morality: From Primordial Soup to Superintelligent Machines",
+      "instructors": ["Joshua D. Greene"],
+      "genEdCode": "GENED 1046",
+      "semester": "Spring 2025",
+      "meetingTimes": "Mon & Wed, 1:30–2:45 PM",
+      "categories": ["Ethics & Civics", "Science & Technology in Society"]
+    },
+    {
+      "courseTitle": "Human Trafficking, Slavery and Abolition in the Modern World",
+      "instructors": ["Orlando Patterson"],
+      "genEdCode": "GENED 1115",
+      "semester": "Spring 2025",
+      "meetingTimes": "Mon & Wed, 1:30–2:45 PM",
+      "categories": ["Ethics & Civics", "Histories, Societies, Individuals"]
+    },
+    {
+      "courseTitle": "If There is No God, All is Permitted",
+      "instructors": ["Jay Harris"],
+      "genEdCode": "GENED 1161",
+      "semester": "Spring 2025",
+      "meetingTimes": "Tue & Thu, 1:30–2:45 PM",
+      "categories": ["Ethics & Civics"]
+    },
+    {
+      "courseTitle": "Philanthropy, Nonprofits, and the Social Good",
+      "instructors": ["Shai M. Dromi"],
+      "genEdCode": "GENED 1192",
+      "semester": "Spring 2025",
+      "meetingTimes": "Tue, 12:00–2:45 PM",
+      "categories": ["Ethics & Civics"]
+    },
+    {
+      "courseTitle": "Philosophy of Technology",
+      "instructors": ["Mathias Risse"],
+      "genEdCode": "GENED 1194",
+      "semester": "Spring 2025",
+      "meetingTimes": "Mon & Wed, 10:30–11:45 AM",
+      "categories": ["Ethics & Civics"]
+    },
+    {
+      "courseTitle": "Reclaiming Argument: Logic as a Force for Good",
+      "instructors": ["Edward J. Hall"],
+      "genEdCode": "GENED 1051",
+      "semester": "Spring 2025",
+      "meetingTimes": "Mon, Wed & Fri, 9:00–10:15 AM",
+      "categories": ["Ethics & Civics"]
+    },
+    {
+      "courseTitle": "U.S. K-12 Schools: Assumptions, Binaries, and Controversies",
+      "instructors": ["Elizabeth City"],
+      "genEdCode": "GENED 1189",
+      "semester": "Spring 2025",
+      "meetingTimes": "Tue, 9:00–11:45 AM",
+      "categories": ["Ethics & Civics"]
+    },
+    {
+      "courseTitle": "Unity and Division",
+      "instructors": ["Ryan Enos"],
+      "genEdCode": "GENED 1202",
+      "semester": "Spring 2025",
+      "meetingTimes": "Tue & Thu, 10:30–11:45 AM",
+      "categories": ["Ethics & Civics"]
+    },
+    {
+      "courseTitle": "What is a Republic?",
+      "instructors": ["Daniel Carpenter"],
+      "genEdCode": "GENED 1032",
+      "semester": "Spring 2025",
+      "meetingTimes": "Mon & Wed, 3:00–4:15 PM",
+      "categories": ["Ethics & Civics", "Histories, Societies, Individuals"]
+    },
+
+
+    {
+      "courseTitle": "American Capitalism",
+      "instructors": ["Sven Beckert"],
+      "genEdCode": "GENED 1159",
+      "semester": "Spring 2025",
+      "meetingTimes": "Tue & Thu, 12:00–1:15 PM",
+      "categories": ["Histories, Societies, Individuals"]
+    },
+    {
+      "courseTitle": "Asian Americans as an American Paradox",
+      "instructors": ["Ju Yon Kim", "Erika Lee", "Taeku Lee"],
+      "genEdCode": "GENED 1206",
+      "semester": "Spring 2025",
+      "meetingTimes": "Tue, 12:00–2:45 PM",
+      "categories": ["Histories, Societies, Individuals"]
+    },
+    {
+      "courseTitle": "Ballots and Bibles",
+      "instructors": ["David Holland"],
+      "genEdCode": "GENED 1062",
+      "semester": "Spring 2025",
+      "meetingTimes": "Mon & Wed, 10:30–11:45 AM",
+      "categories": ["Histories, Societies, Individuals"]
+    },
+    {
+      "courseTitle": "Forced to Be Free",
+      "instructors": ["Andrew Gordon", "Erez Manela"],
+      "genEdCode": "GENED 1017",
+      "semester": "Spring 2025",
+      "meetingTimes": "Tue & Thu, 1:30–2:45 PM",
+      "categories": ["Histories, Societies, Individuals"]
+    },
+    {
+      "courseTitle": "Moctezuma’s Mexico Then and Now",
+      "instructors": ["Davíd L. Carrasco", "William L. Fash"],
+      "genEdCode": "GENED 1148",
+      "semester": "Spring 2025",
+      "meetingTimes": "Mon & Wed, 10:30–11:45 AM",
+      "categories": ["Histories, Societies, Individuals"]
+    },
+    {
+      "courseTitle": "Pyramid Schemes",
+      "instructors": ["Peter Der Manuelian"],
+      "genEdCode": "GENED 1099",
+      "semester": "Spring 2025",
+      "meetingTimes": "Mon & Wed, 12:00–1:15 PM",
+      "categories": ["Histories, Societies, Individuals"]
+    },
+    {
+      "courseTitle": "The Crusades and the Making of East and West",
+      "instructors": ["Dimiter Angelov"],
+      "genEdCode": "GENED 1088",
+      "semester": "Spring 2025",
+      "meetingTimes": "Tue & Thu, 12:00–1:15 PM",
+      "categories": ["Histories, Societies, Individuals"]
+    },
+    {
+      "courseTitle": "The Holocaust",
+      "instructors": ["Kevin Madigan"],
+      "genEdCode": "GENED 1118",
+      "semester": "Spring 2025",
+      "meetingTimes": "Tue & Thu, 10:30–11:45 AM",
+      "categories": ["Histories, Societies, Individuals"]
+    },
+    {
+      "courseTitle": "The United States and China",
+      "instructors": ["William C. Kirby"],
+      "genEdCode": "GENED 1068",
+      "semester": "Spring 2025",
+      "meetingTimes": "Tue & Thu, 10:30–11:45 AM",
+      "categories": ["Histories, Societies, Individuals"]
+    },
+    {
+      "courseTitle": "Why Democracy?",
+      "instructors": ["Daniel Ziblatt"],
+      "genEdCode": "GENED 1204",
+      "semester": "Spring 2025",
+      "meetingTimes": "Tue & Thu, 12:00–1:15 PM",
+      "categories": ["Histories, Societies, Individuals"]
+    },
+
+    {
+      "courseTitle": "AI, Computing and Thinking",
+      "instructors": ["Petros Koumoutsakos"],
+      "genEdCode": "GENED 1187",
+      "semester": "Spring 2025",
+      "meetingTimes": "Mon & Wed, 12:00–1:15 PM",
+      "categories": ["Science & Technology in Society"]
+    },
+    {
+      "courseTitle": "Great Experiments that Changed Our World",
+      "instructors": ["Philip Sadler"],
+      "genEdCode": "GENED 1037",
+      "semester": "Spring 2025",
+      "meetingTimes": "Tue & Thu, 9:00–10:15 AM",
+      "categories": ["Science & Technology in Society"]
+    },
+    {
+      "courseTitle": "How Music Works: Engineering the Acoustical World",
+      "instructors": ["Robert Wood"],
+      "genEdCode": "GENED 1080",
+      "semester": "Spring 2025",
+      "meetingTimes": "Mon & Wed, 11:15–12:30 PM",
+      "categories": ["Science & Technology in Society"]
+    },
+    {
+      "courseTitle": "Human Evolution, Human Health, and Climate Change",
+      "instructors": ["Kevin Uno"],
+      "genEdCode": "GENED 1027",
+      "semester": "Spring 2025",
+      "meetingTimes": "Tue & Thu, 10:30–11:45 AM",
+      "categories": ["Science & Technology in Society"]
+    },
+    {
+      "courseTitle": "Life as a Planetary Phenomenon",
+      "instructors": ["Dimitar Sasselov"],
+      "genEdCode": "GENED 1070",
+      "semester": "Spring 2025",
+      "meetingTimes": "Tue & Thu, 10:30–11:45 AM",
+      "categories": ["Science & Technology in Society"]
+    },
+    {
+      "courseTitle": "Prediction: The Past and Present of the Future",
+      "instructors": ["Alyssa Goodman"],
+      "genEdCode": "GENED 1112",
+      "semester": "Spring 2025",
+      "meetingTimes": "Wed, 3:00–5:45 PM",
+      "categories": ["Science & Technology in Society"]
+    },
+    {
+      "courseTitle": "Sleep",
+      "instructors": ["Charles Czeisler", "Frank A.J.L. Scheer"],
+      "genEdCode": "GENED 1038",
+      "semester": "Spring 2025",
+      "meetingTimes": "Wed, 12:45–2:45 PM",
+      "categories": ["Science & Technology in Society"]
+    },
+    {
+      "courseTitle": "Water and the Environment",
+      "instructors": ["Kaighin McColl"],
+      "genEdCode": "GENED 1158",
+      "semester": "Spring 2025",
+      "meetingTimes": "Tue & Thu, 1:30–2:45 PM",
+      "categories": ["Science & Technology in Society"]
+    },
+    {
+      "courseTitle": "What is Life? From Quarks to Consciousness",
+      "instructors": ["Andrew Berry", "Logan McCarty"],
+      "genEdCode": "GENED 1029",
+      "semester": "Spring 2025",
+      "meetingTimes": "Mon, Wed & Fri 12:00–1:15 PM",
+      "categories": ["Science & Technology in Society"]
+    }
+
+  ],
+
+  "categories": {
+    "Aesthetics & Culture": [
+      "Creativity",
+      "East Asian Cinema",
+      "Grimm’s Fairy Tales",
+      "Harvard Gets Medieval",
+      "Language in Culture and Society",
+      "Permanent Impermanence",
+      "Sexuality in Literature",
+      "The Power, Art, and Technology of Writing in East Asia",
+      "Tragedy Today",
+      "What is a Book?",
+      "What Is the Good China Story?"
+    ],
+    "Ethics & Civics": [
+      "Evolving Morality",
+      "Human Trafficking, Slavery and Abolition",
+      "If There is No God, All is Permitted",
+      "Philanthropy and the Social Good",
+      "Philosophy of Technology",
+      "Reclaiming Argument",
+      "U.S. K-12 Schools",
+      "Unity and Division",
+      "What is a Republic?"
+    ],
+    "Histories, Societies, Individuals": [
+      "American Capitalism",
+      "Asian Americans as an American Paradox",
+      "Ballots and Bibles",
+      "Forced to Be Free",
+      "Human Trafficking, Slavery and Abolition",
+      "Moctezuma’s Mexico",
+      "Pyramid Schemes",
+      "The Crusades and the Making of East and West",
+      "The Holocaust",
+      "The United States and China",
+      "What is a Republic?",
+      "Why Democracy?"
+    ],
+    "Science & Technology in Society": [
+      "AI, Computing and Thinking",
+      "Evolving Morality",
+      "Great Experiments",
+      "How Music Works",
+      "Human Evolution and Climate Change",
+      "Life as a Planetary Phenomenon",
+      "Prediction",
+      "Sleep",
+      "Water and the Environment",
+      "What is Life?"
+    ]
+  }
+}

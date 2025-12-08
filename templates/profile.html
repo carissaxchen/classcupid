@@ -100,7 +100,13 @@
                         </div>
                         
                         <div class="requirements-column">
-                            <h3>Divisional Distribution</h3>
+                            <h3>
+                                Divisional Distribution
+                                <span class="info-icon" onclick="toggleInfoTooltip(event)" title="Click for more information">i</span>
+                                <span class="info-tooltip" id="divisional-info-tooltip">
+                                    This option will select <strong>all</strong> concentrations within each division
+                                </span>
+                            </h3>
                             <label class="checkbox-label">
                                 <input type="checkbox" name="requirements" value="Arts and Humanities"
                                        {% if 'Arts and Humanities' in user_requirements %}checked{% endif %}>

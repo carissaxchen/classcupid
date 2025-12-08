@@ -3,6 +3,35 @@
 {% block title %}Discover - Class Cupid{% endblock %}
 
 {% block content %}
+<!-- Welcome Popup Modal -->
+{% if is_first_visit and course %}
+<div class="welcome-popup" id="welcomePopup">
+    <div class="welcome-popup-content">
+        <h2>Welcome to Class Cupid!</h2>
+        <p>Here's how the buttons work:</p>
+        <div class="button-guide">
+            <div class="guide-item">
+                <button class="guide-btn undo-btn small-btn"><span>←</span></button>
+                <span class="guide-text">Undo your previous action</span>
+            </div>
+            <div class="guide-item">
+                <button class="guide-btn discard-btn"><span>✕</span></button>
+                <span class="guide-text">Dislike this course</span>
+            </div>
+            <div class="guide-item">
+                <button class="guide-btn heart-btn"><span>♥</span></button>
+                <span class="guide-text">Like this course</span>
+            </div>
+            <div class="guide-item">
+                <button class="guide-btn star-btn small-btn"><span>★</span></button>
+                <span class="guide-text">Super like this course</span>
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="closeWelcomePopup()">Got it</button>
+    </div>
+</div>
+{% endif %}
+
 <div class="discover-container">
     {% if message %}
         <div class="no-courses-message">

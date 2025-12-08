@@ -33,3 +33,39 @@ function toggleAffiliationSections() {
         if (otherSection) otherSection.style.display = 'none';
     }
 }
+
+// Toggle info tooltip on click
+function toggleInfoTooltip(event) {
+    event.stopPropagation();
+    const tooltip = document.getElementById('divisional-info-tooltip');
+    if (tooltip) {
+        tooltip.classList.toggle('show');
+    }
+}
+
+// Close tooltip when clicking outside
+document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('click', function(event) {
+        const tooltip = document.getElementById('divisional-info-tooltip');
+        const infoIcon = event.target.closest('.info-icon');
+        
+        if (tooltip && !infoIcon && !tooltip.contains(event.target)) {
+            tooltip.classList.remove('show');
+        }
+    });
+    
+    // Check if welcome popup was already dismissed
+    const welcomePopup = document.getElementById('welcomePopup');
+    if (welcomePopup && sessionStorage.getItem('welcomePopupDismissed') === 'true') {
+        welcomePopup.classList.add('hidden');
+    }
+});
+
+// Close welcome popup and remember dismissal
+function closeWelcomePopup() {
+    const popup = document.getElementById('welcomePopup');
+    if (popup) {
+        popup.classList.add('hidden');
+        sessionStorage.setItem('welcomePopupDismissed', 'true');
+    }
+}

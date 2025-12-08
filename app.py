@@ -25,63 +25,9 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///classcupid.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 
-
-def _run_migrations():
-    """Run database migrations to add missing columns to existing databases"""
-    from sqlalchemy import text, inspect
-    
-    try:
-        inspector = inspect(db.engine)
-        
-        # Get existing columns for each table
-        table_names = inspector.get_table_names()
-        users_columns = {col['name'] for col in inspector.get_columns('users')} if 'users' in table_names else set()
-        courses_columns = {col['name'] for col in inspector.get_columns('courses')} if 'courses' in table_names else set()
-        
-        with db.engine.connect() as conn:
-            # Migrations for users table
-            if 'affiliation' not in users_columns:
-                conn.execute(text("ALTER TABLE users ADD COLUMN affiliation VARCHAR(50)"))
-                conn.commit()
-            
-            if 'term_preference' not in users_columns:
-                conn.execute(text("ALTER TABLE users ADD COLUMN term_preference TEXT"))
-                conn.commit()
-            
-            if 'school_preferences' not in users_columns:
-                conn.execute(text("ALTER TABLE users ADD COLUMN school_preferences TEXT"))
-                conn.commit()
-            
-            # Migrations for courses table
-            if 'class_level_attribute' not in courses_columns:
-                conn.execute(text("ALTER TABLE courses ADD COLUMN class_level_attribute VARCHAR(100)"))
-                conn.commit()
-            
-            if 'class_level_attribute_description' not in courses_columns:
-                conn.execute(text("ALTER TABLE courses ADD COLUMN class_level_attribute_description VARCHAR(200)"))
-                conn.commit()
-            
-            if 'course_component' not in courses_columns:
-                conn.execute(text("ALTER TABLE courses ADD COLUMN course_component VARCHAR(100)"))
-                conn.commit()
-            
-            if 'subject_description' not in courses_columns:
-                conn.execute(text("ALTER TABLE courses ADD COLUMN subject_description VARCHAR(200)"))
-                conn.commit()
-            
-            if 'catalog_school_description' not in courses_columns:
-                conn.execute(text("ALTER TABLE courses ADD COLUMN catalog_school_description VARCHAR(200)"))
-                conn.commit()
-    except Exception as e:
-        # Silently fail - migrations are optional for new databases
-        pass
-
-
-# Create tables and run migrations
+# Create all database tables
 with app.app_context():
     db.create_all()
-    # Run migrations to add any missing columns to existing databases
-    _run_migrations()
 
 
 @app.context_processor
@@ -247,13 +193,13 @@ def profile():
     # GET request - show profile form
     # Load JSON files for options
     try:
-        with open('harvard_college_concentrations.json', 'r') as f:
+        with open('data/json/harvard_college_concentrations.json', 'r') as f:
             harvard_concentrations = json.load(f)
     except:
         harvard_concentrations = []
     
     try:
-        with open('harvard_schools.json', 'r') as f:
+        with open('data/json/harvard_schools.json', 'r') as f:
             harvard_schools = json.load(f)
     except:
         harvard_schools = []
@@ -359,6 +305,9 @@ def rank_courses_binary_search(courses, comparisons):
         
         sorted_courses.insert(low, course)
     
+    # Reverse the list so best courses are first (the binary search builds worst-first)
+    sorted_courses.reverse()
+    
     # Create rank dictionary (0 = best rank)
     rankings = {}
     for rank, course in enumerate(sorted_courses):
@@ -399,9 +348,9 @@ def get_gened_course_codes_for_categories(selected_categories, term_preferences)
     # Determine which GenEds JSON files to use based on term preferences
     geneds_files = []
     if "2026 Spring" in term_preferences:
-        geneds_files.append('2026_Spring_Geneds.json')
+        geneds_files.append('data/json/2026_Spring_Geneds.json')
     if "2025 Fall" in term_preferences:
-        geneds_files.append('2025_Fall_Geneds.json')
+        geneds_files.append('data/json/2025_Fall_Geneds.json')
     
     try:
         # Load GenEds JSON files and merge results
@@ -526,6 +475,8 @@ def map_concentration_to_department(concentration):
         "Romance Languages and Literature": "Romance Languages and Literatures",
         "Slavic Literatures and Cultures": "Slavic Languages and Literatures",
         "Studies of Women, Gender, and Sexuality": "Women, Gender, and Sexuality, Studies of",
+        "Electrical Engineering": "Engineering Sciences",
+        "Mechanical Engineering": "Engineering Sciences",
     }
     
     # Return mapped value if exists, otherwise return original
@@ -798,29 +749,28 @@ def recommend_course_weighted(user, seen_course_ids):
         year_lower = year.lower() if year else None
         
         for course in filtered_courses:
-            # Handle FYSEMR courses: only freshmen get weight, others get 0
-            if is_fysemr_course(course):
-                if year_lower == "freshman":
-                    weighted_pool.extend([course] * 3)  # Weight of 3 for freshmen
-                # Non-freshmen get weight 0 (not added to pool)
-                continue
-            
             level = course.classify_level()
             weight = 0
             
             if year_lower == "freshman":
-                if level == "UG_intro":
+                # Handle FYSEMR courses: only freshmen get weight
+                # Lower weight (1) to prevent FYSEMR courses from dominating when many are available
+                if is_fysemr_course(course):
+                    weight = 1  # Lower weight for better variety with other course types
+                elif level == "UG_intro":
                     weight = 8  # Heavy on UG_intro (1-99, 1000-1099)
                 elif level == "UG_mid":
                     weight = 2  # Moderate weight on UG_mid (100-199, 1100-1999)
                 elif level == "Alpha":
-                    weight = 4  # Alpha courses available to all
+                    weight = 2  # Alpha courses available to all
                 # NO Grad_low or Grad_research for freshmen
                 # NO tutorials, special seminars, or reading research for freshmen
-                # First year seminars are handled above (weight=3 for freshmen)
             
             elif year_lower == "sophomore":
-                if level == "UG_intro":
+                # Non-freshmen get weight 0 for FYSEMR courses (not added to pool)
+                if is_fysemr_course(course):
+                    weight = 0  # Skip FYSEMR courses for non-freshmen
+                elif level == "UG_intro":
                     weight = 5  # Less highly than freshmen, but not too low
                 elif level == "UG_mid":
                     weight = 5  # More highly than UG_intro
@@ -831,11 +781,14 @@ def recommend_course_weighted(user, seen_course_ids):
                 elif level == "ReadingResearch":  # 91, 910
                     weight = 2
                 elif level == "Alpha":
-                    weight = 4  # Same across all years
+                    weight = 2  # Same across all years
                 # NO Grad_low or Grad_research for sophomores
             
             elif year_lower == "junior":
-                if level == "UG_intro":
+                # Non-freshmen get weight 0 for FYSEMR courses (not added to pool)
+                if is_fysemr_course(course):
+                    weight = 0  # Skip FYSEMR courses for non-freshmen
+                elif level == "UG_intro":
                     weight = 2  # Very low
                 elif level == "UG_mid":
                     weight = 8  # Highly (more than sophomores)
@@ -848,11 +801,14 @@ def recommend_course_weighted(user, seen_course_ids):
                 elif level == "ReadingResearch":  # 91, 910
                     weight = 2
                 elif level == "Alpha":
-                    weight = 4  # Same across all years
+                    weight = 2  # Same across all years
                 # NO Grad_research for juniors
             
             elif year_lower == "senior":
-                if level == "UG_intro":
+                # Non-freshmen get weight 0 for FYSEMR courses (not added to pool)
+                if is_fysemr_course(course):
+                    weight = 0  # Skip FYSEMR courses for non-freshmen
+                elif level == "UG_intro":
                     weight = 1  # Very low (lowest of all years, practically never display)
                 elif level == "UG_mid":
                     weight = 7  # Highly (more than juniors)
@@ -865,7 +821,7 @@ def recommend_course_weighted(user, seen_course_ids):
                 elif level == "ReadingResearch":  # 91, 910
                     weight = 2
                 elif level == "Alpha":
-                    weight = 4  # Same across all years
+                    weight = 2  # Same across all years
                 # NO Grad_research for seniors
             
             # Add course to pool with its weight
@@ -961,10 +917,13 @@ def discover():
             if user_terms and course.term_description not in user_terms:
                 course = None  # Course doesn't match term preference, treat as not found
             if course:
-                return render_template("discover.html", course=course)
+                return render_template("discover.html", course=course, is_first_visit=False)
     
     # Get courses user has already seen
     seen_course_ids = [p.course_id for p in UserCoursePreference.query.filter_by(user_id=user.id).all()]
+    
+    # Check if this is the user's first visit (no previous interactions)
+    is_first_visit = len(seen_course_ids) == 0
     
     # Use weighted recommendation algorithm
     course = recommend_course_weighted(user, seen_course_ids)
@@ -985,17 +944,19 @@ def discover():
                                  course=None, 
                                  message="No more relevant courses!",
                                  prompt_type="matches",
-                                 saved_count=saved_count)
+                                 saved_count=saved_count,
+                                 is_first_visit=False)
         else:
             # No saved courses - prompt to add more subjects
             return render_template("discover.html", 
                                  course=None, 
                                  message="No more courses match your current preferences!",
-                                 prompt_type="profile")
+                                 prompt_type="profile",
+                                 is_first_visit=False)
     
    
     
-    return render_template("discover.html", course=course)
+    return render_template("discover.html", course=course, is_first_visit=is_first_visit)
 
 
 @app.route("/swipe", methods=["POST"])
@@ -1185,9 +1146,10 @@ def matches():
         term_rankings = rankings_by_term.get(term, {})
         
         if show_ranked and term_rankings:
-            # Use rankings: sort by rank (lower rank = better = higher in list)
+            # Use rankings: sort by rank ascending (rank 0 = best = position 1 at top)
+            # Rank 0 should appear first, then 1, then 2, etc.
             prefs.sort(key=lambda p: (
-                term_rankings.get(p.course.id, 999)  # Use ranking, default to 999 if not ranked
+                term_rankings.get(p.course.id, 999)  # Lower rank number = better course = appears higher in list
             ))
             # Create ranking positions (1-based)
             for pref in prefs:

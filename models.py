@@ -167,9 +167,6 @@ class Course(db.Model):
             elif self.class_level_attribute == "GRADCOURSE":
                 return "Grad_research"  # Graduate research course
         
-        # Fall back to class_level_attribute_description if attribute not set
-        if self.class_level_attribute_description and "Graduate" in self.class_level_attribute_description:
-            return "Grad_low"  # Default to Grad_low if description indicates graduate
         
         # Now check course number
         num = self.extract_course_number()
