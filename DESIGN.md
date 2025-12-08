@@ -24,6 +24,7 @@ The application follows a traditional MVC (Model-View-Controller) pattern:
 - **Controllers** (`app.py`): Flask routes handling business logic and request routing
 - **Static Assets** (`static/`): CSS stylesheets and JavaScript files
 - **Helpers** (`helpers.py`): Utility functions (login decorator, error handling)
+- **Data Files** (`data/`): Organized storage for JSON course catalogs, Gen Ed mappings, and reference data
 
 ## Database Design
 
@@ -44,7 +45,7 @@ Stores user authentication and preference data:
   - `school_preferences`: JSON array for "Other Affiliation" users
 - **Profile**: `affiliation` (Harvard College/Other), `year` (Freshman/Sophomore/Junior/Senior)
 
-**Design Decision**: Using JSON storage for preferences allows for easy extensibility without schema migrations. The `get_concentrations()`, `get_requirements()`, `get_schools()`, and `get_terms()` methods provide backward compatibility with comma-separated string formats.
+**Design Decision**: Using `Text` columns instead of `CHAR` allows storage of strings of arbitrary length, as users may select many concentrations or requirements. The `_parse_json()` helper method in the User model centralizes JSON parsing logic and returns empty lists for invalid JSON (ensuring robustness for new app rollouts).
 
 #### 2. `courses` Table
 
@@ -58,7 +59,7 @@ Stores course information from Harvard's course catalog JSON:
 - **Requirement Flags**: Boolean columns for Gen Ed categories, divisional distributions, language requirement, etc.
 - **Classification Fields**: `class_level_attribute`, `catalog_school_description`, `course_component`, `catalog_subject`
 
-**Design Decision**: The composite unique constraint on `(course_id, term_description)` enables multi-semester support without duplicating the same course record. This allows users to see courses offered in both Fall and Spring as separate entities in the matching game.
+**Design Decision**: The composite unique constraint on `(course_id, term_description)` enables multi-semester support without duplicating the same course record. This was necessary because during testing, courses like Math 1B and CS50 offered in both Fall and Spring were being overwritten in the database - the Spring version would replace the Fall version when using only `course_id` as unique. Now each semester's offering is stored separately.
 
 #### 3. `user_course_preferences` Table
 
@@ -85,10 +86,46 @@ Stores pairwise comparisons from the matching game:
 
 ### Relationships
 
+The database schema uses the following relationships:
+
+```
+users (1) ──────< (many) user_course_preferences
+  │
+  └───────────────< (many) sort_comparisons
+
+courses (1) ──────< (many) user_course_preferences
+  │
+  ├───────────────< (many) sort_comparisons (as winner_course_id)
+  └───────────────< (many) sort_comparisons (as loser_course_id)
+```
+
 - **User → UserCoursePreference**: One-to-many with cascade delete (deleting a user removes all preferences)
 - **User → SortComparison**: One-to-many with cascade delete
 - **Course → UserCoursePreference**: One-to-many
 - **Course → SortComparison**: One-to-many (via both `winner_course_id` and `loser_course_id`)
+
+### Why SQLAlchemy?
+
+SQLAlchemy was chosen over raw SQL or SQLite for several reasons:
+1. **No Manual SQL Queries**: Writing SQL queries manually would have been very time-consuming
+2. **SQL Injection Prevention**: SQLAlchemy automatically escapes dangerous characters, preventing SQL injection attacks
+3. **Type Safety**: ORM provides Python-level type checking and validation
+4. **Relationship Management**: Automatic handling of foreign keys and relationships simplifies data access
+
+### Course Model Helper Methods
+
+The Course model includes several helper methods for data processing:
+
+- **`extract_course_number()`**: Sanitizes course numbers by extracting digits. Handles variations like:
+  - "COMPSCI 50" → 50
+  - "MATH 1B" → 1 (extracts digits, ignores letters)
+  - "ARABIC A" → None (non-numeric returns None)
+  
+  This extraction is necessary for the classification algorithm.
+
+- **`get_days_display()`** and **`has_day()`**: Normalize day formats to abbreviated versions (M, T, W, Th, F, S, Su) for consistent display and checking.
+
+- **`classify_level()`**: The most important method for course recommendation - classifies courses into difficulty levels based on Harvard's numbering system (see Algorithm section for details).
 
 ## Core Algorithms
 
@@ -148,14 +185,72 @@ The `classify_level()` method on the Course model categorizes courses:
 
 #### Stage 5: Weighted Selection
 
-Courses are weighted based on year and level, then randomly selected from a weighted pool:
+**Why Weighted Selection?** Initially, the system randomly generated courses from selected requirements/concentrations. However, this caused problems:
+- Freshmen were getting high-level classes or tutorials they weren't eligible for
+- Upperclassmen were seeing first-year seminars or introductory courses they didn't need
 
-- **Freshman**: `UG_intro` (weight 8), `UG_mid` (weight 2), `Alpha` (weight 5)
+Weighted selection solves this by probabilistically favoring appropriate courses while maintaining discovery and randomness.
+
+**How It Works**: A weight of `n` means the course is added to the selection pool `n` times. For example:
+- A course with weight 8 appears 8 times in the pool
+- A course with weight 2 appears 2 times in the pool
+- Random selection from this weighted pool makes higher-weighted courses 4x more likely to appear
+
+**Weight Assignments by Year**:
+- **Freshman**: `UG_intro` (weight 8), `UG_mid` (weight 2), `Alpha` (weight 5), FYSEMR (weight 1)
 - **Sophomore**: `UG_intro` (weight 5), `UG_mid` (weight 5), tutorials/seminars/research (weight 2), `Alpha` (weight 5)
 - **Junior**: `UG_intro` (weight 2), `UG_mid` (weight 8), `Grad_low` (weight 3), tutorials/seminars/research (weight 2), `Alpha` (weight 5)
 - **Senior**: `UG_intro` (weight 1), `UG_mid` (weight 7), `Grad_low` (weight 6), tutorials/seminars/research (weight 2), `Alpha` (weight 5)
 
-**Design Decision**: Weighted selection (adding courses to a pool multiple times based on weight) provides probabilistic ranking while maintaining randomness. This prevents deterministic ordering while still favoring appropriate courses.
+**Note**: For graduate students and "Other Affiliation" users, courses are not weighted - all eligible courses appear equally since we don't have detailed information about graduate-level class difficulty.
+
+**Design Decision**: Weighted selection provides probabilistic ranking while maintaining randomness. This prevents deterministic ordering (users won't see courses in the same order every time) while still favoring appropriate courses.
+
+#### Stage 5b: Course Exclusion After Swiping
+
+**How Courses Are Excluded from the Pool**: Once a user swipes a course (heart, star, or discard), it is permanently removed from the recommendation pool until the user resets their choices. This is implemented as follows:
+
+1. **User Action**: When a user swipes on `/discover`, the `/swipe` route creates or updates a `UserCoursePreference` record with `user_id`, `course_id`, and `status` (heart/star/discard).
+
+2. **Collecting Seen Courses**: Before recommending a course, the system queries all `UserCoursePreference` records for the user:
+   ```python
+   seen_course_ids = [p.course_id for p in UserCoursePreference.query.filter_by(user_id=user.id).all()]
+   ```
+   This collects all course IDs the user has interacted with, regardless of action type.
+
+3. **Filtering in Recommendation**: The `recommend_course_weighted()` function receives `seen_course_ids` and excludes them from the query:
+   ```python
+   if seen_course_ids:
+       query = query.filter(~Course.id.in_(seen_course_ids))
+   ```
+
+4. **Result**: Once swiped, a course won't appear again until the user uses the "Reset All" function (which deletes all `UserCoursePreference` records).
+
+**Design Decision**: Excluding all swiped courses (not just discarded ones) ensures users don't see the same course twice, making the discovery process more efficient.
+
+#### Stage 5c: First Year Seminar and Gen Ed Union Logic
+
+For First Year Seminars and Gen Ed categories, the system uses **union logic** instead of intersection:
+
+- **Example**: If a user selects "First Year Seminar" + "Statistics" concentration, they see:
+  - All First Year Seminar courses (regardless of department) **OR**
+  - All appropriate Statistics courses
+  
+- **Reasoning**: Anecdotal evidence suggests users looking for FYSEMRs or Gen Eds are interested in exploring all available options, not just those in their concentration. This union approach provides broader discovery while still filtering by concentration if selected.
+
+**Implementation**: FYSEMR courses are collected in a separate query (`fysemr_query`) and merged with the main filtered results, bypassing concentration and level filtering for FYSEMR courses.
+
+#### Stage 5d: Language Requirement Filtering
+
+The language requirement uses pattern-based identification:
+
+- **Filtering Method**: Identifies introductory language courses by checking:
+  1. Course number starts with common language department prefixes (FRENCH, SPANISH, CHINESE, GERMAN, etc.)
+  2. Course number pattern matches introductory levels: 1, 2, 3, A, B, AA, BA
+
+- **Reasoning**: Per Harvard catalog guidelines, introductory language classes use alphabetical or low numeric codes. Users fulfilling language requirements are typically beginners, so advanced courses (numbered 100+) are excluded.
+
+- **Known Limitation**: Each department has different language requirement metrics. For example, Chinese requires students to score above 130, meaning some users may need numbered classes like Chinese 120. However, since department-specific requirement information wasn't available in the course catalog JSON, this limitation was accepted. Users needing advanced language courses can find them by selecting specific language concentrations.
 
 #### Stage 6: Other Affiliation Algorithm
 
@@ -170,23 +265,68 @@ For graduate students and other affiliations, completely different filtering app
 
 ### 2. Binary Search Ranking Algorithm (`rank_courses_binary_search`)
 
-The ranking system uses a binary search insertion sort to create a total ordering from pairwise comparisons:
+The ranking system uses a binary search insertion sort to create a total ordering from pairwise comparisons. This algorithm was inspired by Beli's algorithm for efficient ranking from sparse comparisons.
 
 #### Algorithm Overview
 
-1. **Comparison Graph Building**: Creates a lookup dictionary mapping course pairs to comparison results
-2. **Win Count Calculation**: Counts direct wins/losses for each course as a fallback ordering
-3. **Binary Search Insertion**: For each course, uses binary search to find its position in a sorted list:
-   - Compares the new course to the middle course in the sorted list
-   - Uses `is_better()` helper to determine ordering (direct comparison, transitive inference via win count, or unknown)
-   - Recursively narrows the search space
-4. **Rank Assignment**: Assigns 0-based ranks (0 = best) based on final sorted order
+1. **Comparison Graph Building**: Creates a lookup dictionary mapping course pairs to comparison results:
+   - `(course1_id, course2_id) → True` if course1 beats course2
+   - Stores both directions for efficient lookup
+
+2. **Win Count Calculation**: Counts direct wins/losses for each course:
+   - Each win: +1
+   - Each loss: -1
+   - Used as fallback ordering when courses haven't been directly compared
+
+3. **Initial Sorting**: Courses are pre-sorted by win count (descending) to provide a good starting order for binary search insertion.
+
+4. **Binary Search Insertion**: For each course in the initial order:
+   - Uses binary search to find insertion position in `sorted_courses` list
+   - `is_better()` helper determines ordering:
+     - **Direct comparison exists**: Returns True/False based on comparison result
+     - **Reverse comparison exists**: Negates the reverse comparison
+     - **No comparison**: Uses win count difference as proxy
+     - **Equal/unknown**: Returns None (defaults to inserting after middle)
+   - Binary search logic:
+     - If current course > middle course → insert after middle (`low = mid + 1`)
+     - If current course < middle course → insert before middle (`high = mid`)
+     - If equal/unknown → insert after middle (`low = mid + 1`)
+   - Inserts course at calculated position
+
+5. **Reverse and Rank**: The binary search builds the list worst-to-best, so it's reversed to put best courses first. Then 0-based ranks are assigned (0 = best course).
+
+#### Display Logic
+
+**Before Ranking Threshold**: Courses are displayed with:
+- Starred courses first
+- Hearted courses second
+- Sorted by course number within each group
+
+**After Ranking Threshold**: Courses are displayed by their calculated rank (position 1, 2, 3...), with the numerical rank shown in a leftmost column.
+
+#### Minimum Comparisons Formula
+
+The minimum number of comparisons needed before ranking is displayed:
+```python
+min_comparisons = max(3, min(10, total_courses - 1))
+```
+
+**How It Works**:
+- `min(10, total_courses - 1)`: Takes the lower value between 10 and (number of courses - 1)
+- `max(3, ...)`: Takes the higher value between 3 and the above result
+- **Result**: Minimum is always 3, maximum is always 10, scales with course count in between
+
+**Examples**:
+- 3 courses: `max(3, min(10, 2))` = `max(3, 2)` = **3 comparisons**
+- 5 courses: `max(3, min(10, 4))` = `max(3, 4)` = **4 comparisons**
+- 15 courses: `max(3, min(10, 14))` = `max(3, 10)` = **10 comparisons**
 
 #### Key Design Decisions
 
 - **Binary Search Efficiency**: O(n log n) average case vs. O(n²) for naive insertion sort
 - **Transitive Inference**: Uses win counts when direct comparison doesn't exist, improving ranking with sparse comparison data
 - **Deterministic Ordering**: With sufficient comparisons, produces a consistent ranking
+- **Beli's Algorithm Inspiration**: The approach of using binary search for efficient insertion in ranking problems inspired this implementation
 
 #### Score Calculation (`calculate_course_scores`)
 
@@ -294,12 +434,15 @@ class_cupidv1/
 ├── instance/
 │   └── classcupid.db        # SQLite database (created at runtime)
 ├── flask_session/           # Session files (created at runtime)
-├── 2025_Fall_courses.json   # Fall 2025 course catalog
-├── 2026_Spring_courses.json # Spring 2026 course catalog
-├── 2025_Fall_Geneds.json    # Fall 2025 Gen Ed category mappings
-├── 2026_Spring_Geneds.json  # Spring 2026 Gen Ed category mappings
-├── harvard_college_concentrations.json  # Available concentrations
-└── harvard_schools.json     # Available graduate schools
+├── data/
+│   ├── images/              # Logo files and icons
+│   └── json/                # Course catalogs and reference data
+│       ├── 2025_Fall_courses.json
+│       ├── 2026_Spring_courses.json
+│       ├── 2025_Fall_Geneds.json
+│       ├── 2026_Spring_Geneds.json
+│       ├── harvard_college_concentrations.json
+│       └── harvard_schools.json
 ```
 
 ## Data Flow
@@ -341,13 +484,113 @@ class_cupidv1/
 5. Rankings stored in `UserCoursePreference.ranking_position` (1-based for display)
 6. Template displays courses sorted by ranking_position, then by status (starred before hearted)
 
+## Helper Functions (`helpers.py`)
+
+### `login_required()` Decorator
+
+The `login_required()` function is a decorator that protects routes requiring authentication. Decorators add functionality to other functions by wrapping them. When any route is wrapped with `@login_required`, the decorator checks if the user is authenticated by verifying the presence of `session["user_id"]`. If not authenticated, Flask automatically redirects the user to `/login` before the route handler executes.
+
+**Implementation**: Uses Python's `functools.wraps` to preserve the original function's metadata and wraps the route handler in a check for `session.get("user_id")`.
+
+### `apology()` Function
+
+The `apology()` function returns error messages with HTTP status codes. It serves as a centralized error handler that:
+
+1. **Takes Parameters**: Error message string and HTTP status code (defaults to 400)
+2. **Escapes Special Characters**: Transforms characters that could break URLs or templates:
+   - `-` → `--`
+   - Space → `-`
+   - `_` → `__`
+   - `?` → `~q`
+   - `%` → `~p`
+   - `#` → `~h`
+   - `/` → `~s`
+   - `"` → `''`
+3. **Returns**: A formatted error message string with the status code
+
+**Design Decision**: Centralized error handling ensures consistent error formatting across the application, though most routes now use Flask's `flash()` messages for better user experience (apology is still used for critical validation errors).
+
+## Route Handlers Overview
+
+While most route handlers are self-explanatory, here are brief descriptions of key routes:
+
+### Authentication Routes
+
+- **`login()`**: Handles user authentication - validates username/password, sets session, redirects to discover page
+- **`logout()`**: Clears session and redirects to login page
+- **`register()`**: Creates new user account with hashed password, redirects to profile setup
+
+### Core Feature Routes
+
+- **`profile()`**: Displays and handles updates to user preferences (affiliation, year, concentrations, requirements, terms, schools). Loads JSON files for available options and saves user selections as JSON arrays.
+
+- **`reset_all()`**: Allows users to delete all their course preferences and sort comparisons, effectively resetting their account state. Redirects to discover page to start fresh.
+
+- **`discover()`**: Main discovery route that:
+  - Checks user has term preference set (redirects to profile if not)
+  - Gets list of courses user has already seen
+  - Calls `recommend_course_weighted()` to get next course
+  - Handles special case: if no courses available, shows context-aware message prompting user to check matches or update profile
+  - Supports query parameter `?show_course={id}` for undo functionality
+
+- **`swipe()`**: Handles user interactions on discover page (heart, star, discard). Creates or updates `UserCoursePreference` record and redirects back to discover.
+
+- **`discover_undo()`**: Undoes the last swipe action by deleting the most recent `UserCoursePreference` record and redirecting to the specific course that was undone.
+
+- **`matches()`**: Complex route that:
+  - Groups saved courses (hearted/starred) by term
+  - Groups comparisons by term (ensuring cross-term comparisons are excluded)
+  - Calculates rankings per-term using `rank_courses_binary_search()`
+  - Selects random comparison pairs from the same term
+  - Determines if rankings should be displayed based on comparison count thresholds
+  - Handles display logic: starred first, then hearted, then ranked
+
+- **`compare()`**: Handles comparison game selections. Creates `SortComparison` record for winner/loser pair, ensures courses are from same term, prevents duplicate comparisons via unique constraint.
+
+- **`undo_comparison()`**: Deletes the most recent `SortComparison` record, allowing users to undo their last comparison choice.
+
+- **`skip_comparison()`**: Simply redirects to matches page to show a new comparison pair without recording anything.
+
+- **`update_preference()`**: Allows users to change the status of a saved course (heart/star/remove) from the matches page saved classes list.
+
+### CLI Commands
+
+- **`import_courses(json_file)`**: Flask CLI command to import course data from JSON files. Parses course catalog JSON, extracts all fields, maps to Course model, handles term-specific duplicates via composite unique constraint. Usage: `flask import-courses data/json/2025_Fall_courses.json`
+
 ## Security Considerations
 
-1. **Password Hashing**: Werkzeug's `generate_password_hash()` uses SHA-256 with salt - passwords are never stored in plaintext
-2. **SQL Injection Prevention**: SQLAlchemy ORM automatically escapes user input in queries
-3. **Session Security**: Session IDs are random and stored server-side - only session ID in cookie
-4. **Authentication**: `@login_required` decorator protects routes, redirects to login if not authenticated
-5. **Input Validation**: Form inputs validated server-side (e.g., checking course IDs exist, actions are valid)
+### Authentication and Authorization
+
+1. **Password Hashing**: Werkzeug's `generate_password_hash()` uses SHA-256 with salt - passwords are never stored in plaintext. Each password hash is unique even for the same password due to salting.
+
+2. **Session Security**: 
+   - Session IDs are randomly generated and stored server-side in filesystem
+   - Only the session ID is stored in the client cookie (not sensitive data)
+   - Session files stored in `flask_session/` directory
+
+3. **Route Protection**: 
+   - `@login_required` decorator protects all routes requiring authentication
+   - Automatically redirects unauthenticated users to `/login`
+   - User existence is validated in critical routes (handles edge cases like database recreation)
+
+### Input Validation and Injection Prevention
+
+4. **SQL Injection Prevention**: SQLAlchemy ORM automatically escapes user input in all queries. Raw SQL is never used with user input.
+
+5. **Input Validation**: 
+   - Form inputs validated server-side (e.g., checking course IDs exist, actions are valid)
+   - Type conversion with error handling (e.g., `request.form.get("course_id", type=int)`)
+   - Validation checks prevent invalid operations (e.g., comparing a course to itself)
+
+6. **Cross-Site Request Forgery (CSRF)**: Forms use POST methods, and while not explicitly implementing CSRF tokens, Flask's session-based authentication provides basic protection. For production, CSRF tokens should be added.
+
+### Data Integrity
+
+7. **Unique Constraints**: Database unique constraints prevent duplicate comparisons, duplicate course-term pairs, and duplicate usernames.
+
+8. **Foreign Key Integrity**: SQLAlchemy enforces referential integrity - cannot delete a user or course that has associated preferences/comparisons without cascade delete.
+
+9. **Error Handling**: Graceful error handling for edge cases (missing user, missing course, invalid actions) with appropriate HTTP status codes and user-friendly error messages.
 
 ## Performance Considerations
 

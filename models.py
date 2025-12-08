@@ -17,16 +17,16 @@ class User(db.Model):
     affiliation = db.Column(db.String(50))  # "Harvard College" or "Other"
     year = db.Column(db.String(20))  # Freshman, Sophomore, Junior, Senior
     term_preference = db.Column(db.Text)  # JSON array of terms, e.g., ["2025 Fall", "2026 Spring"]
-    concentration_preferences = db.Column(db.Text)  # JSON string or comma-separated
-    requirement_preferences = db.Column(db.Text)  # JSON string or comma-separated
-    school_preferences = db.Column(db.Text)  # JSON string for "Other" affiliation schools
+    concentration_preferences = db.Column(db.Text)  # JSON array
+    requirement_preferences = db.Column(db.Text)  # JSON array
+    school_preferences = db.Column(db.Text)  # JSON array for "Other" affiliation schools
     
     # Relationships
     course_preferences = db.relationship('UserCoursePreference', backref='user', lazy=True, cascade='all, delete-orphan')
     sort_comparisons = db.relationship('SortComparison', backref='user', lazy=True, cascade='all, delete-orphan')
     
-    def _parse_json_or_comma_separated(self, value):
-        """Helper method to parse JSON or comma-separated string"""
+    def _parse_json(self, value):
+        """Helper method to parse JSON array"""
         if not value:
             return []
         try:
@@ -36,24 +36,24 @@ class User(db.Model):
             # If it's a single value, return as list
             return [parsed] if parsed else []
         except (json.JSONDecodeError, ValueError, TypeError):
-            # Fall back to comma-separated parsing
-            return [item.strip() for item in value.split(',') if item.strip()]
+            # Invalid JSON - return empty list for new app rollout
+            return []
     
     def get_concentrations(self):
-        """Parse concentration preferences from JSON or comma-separated string"""
-        return self._parse_json_or_comma_separated(self.concentration_preferences)
+        """Parse concentration preferences from JSON"""
+        return self._parse_json(self.concentration_preferences)
     
     def get_requirements(self):
-        """Parse requirement preferences from JSON or comma-separated string"""
-        return self._parse_json_or_comma_separated(self.requirement_preferences)
+        """Parse requirement preferences from JSON"""
+        return self._parse_json(self.requirement_preferences)
     
     def get_schools(self):
-        """Parse school preferences from JSON or comma-separated string"""
-        return self._parse_json_or_comma_separated(self.school_preferences)
+        """Parse school preferences from JSON"""
+        return self._parse_json(self.school_preferences)
     
     def get_terms(self):
-        """Parse term preferences from JSON or comma-separated string"""
-        return self._parse_json_or_comma_separated(self.term_preference)
+        """Parse term preferences from JSON"""
+        return self._parse_json(self.term_preference)
 
 
 class Course(db.Model):

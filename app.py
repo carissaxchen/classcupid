@@ -2,11 +2,10 @@ import os
 import json
 import random
 from datetime import datetime
-from flask import Flask, flash, redirect, render_template, request, session, jsonify
+from flask import Flask, flash, redirect, render_template, request, session
 from flask_session import Session
 from werkzeug.security import check_password_hash, generate_password_hash
 from sqlalchemy import func, or_, and_
-from sqlalchemy.orm import aliased
 import click
 
 from helpers import apology, login_required
@@ -37,17 +36,6 @@ def inject_user():
         user = User.query.get(session["user_id"])
         return dict(current_user=user)
     return dict(current_user=None)
-
-
-@app.template_filter('ordinal')
-def ordinal_filter(n):
-    """Convert number to ordinal string (1st, 2nd, 3rd, etc.)"""
-    if n is None:
-        return ""
-    suffix = ['th', 'st', 'nd', 'rd', 'th'][min(n % 10, 4)]
-    if 11 <= (n % 100) <= 13:
-        suffix = 'th'
-    return f"{n}{suffix}"
 
 
 @app.after_request
@@ -1256,22 +1244,6 @@ def skip_comparison():
     """Skip the current comparison pair"""
     # Just redirect to matches to get a new pair
     flash("Comparison skipped", "info")
-    return redirect("/matches")
-
-
-@app.route("/matches/too-tough", methods=["POST"])
-@login_required
-def too_tough():
-    """Mark both courses as too tough to compare"""
-    user_id = session["user_id"]
-    course1_id = request.form.get("course1_id", type=int)
-    course2_id = request.form.get("course2_id", type=int)
-    
-    if not course1_id or not course2_id:
-        return apology("missing course IDs", 400)
-    
-    # Just skip this comparison (don't record anything)
-    flash("Comparison skipped - too tough to decide!", "info")
     return redirect("/matches")
 
 
