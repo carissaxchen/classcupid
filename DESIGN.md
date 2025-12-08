@@ -265,7 +265,7 @@ For graduate students and other affiliations, completely different filtering app
 
 ### 2. Binary Search Ranking Algorithm (`rank_courses_binary_search`)
 
-The ranking system uses a binary search insertion sort to create a total ordering from pairwise comparisons. This algorithm was inspired by Beli's algorithm for efficient ranking from sparse comparisons.
+The ranking system uses a binary search insertion sort to create a total ordering from pairwise comparisons. This algorithm was inspired by [Beli's algorithm]([url](https://notes.ansonbiggs.com/rating-has-never-been-so-good/)) for efficient ranking from sparse comparisons.
 
 #### Algorithm Overview
 
