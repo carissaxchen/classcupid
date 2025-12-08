@@ -582,42 +582,15 @@ While most route handlers are self-explanatory, here are brief descriptions of k
    - Type conversion with error handling (e.g., `request.form.get("course_id", type=int)`)
    - Validation checks prevent invalid operations (e.g., comparing a course to itself)
 
-6. **Cross-Site Request Forgery (CSRF)**: Forms use POST methods, and while not explicitly implementing CSRF tokens, Flask's session-based authentication provides basic protection. For production, CSRF tokens should be added.
 
 ### Data Integrity
 
-7. **Unique Constraints**: Database unique constraints prevent duplicate comparisons, duplicate course-term pairs, and duplicate usernames.
+6. **Unique Constraints**: Database unique constraints prevent duplicate comparisons, duplicate course-term pairs, and duplicate usernames.
 
-8. **Foreign Key Integrity**: SQLAlchemy enforces referential integrity - cannot delete a user or course that has associated preferences/comparisons without cascade delete.
+7. **Foreign Key Integrity**: SQLAlchemy enforces referential integrity - cannot delete a user or course that has associated preferences/comparisons without cascade delete.
 
-9. **Error Handling**: Graceful error handling for edge cases (missing user, missing course, invalid actions) with appropriate HTTP status codes and user-friendly error messages.
+8. **Error Handling**: Graceful error handling for edge cases (missing user, missing course, invalid actions) with appropriate HTTP status codes and user-friendly error messages.
 
-## Performance Considerations
-
-1. **Database Indexing**: Foreign keys automatically indexed by SQLAlchemy
-2. **Query Optimization**: Uses SQLAlchemy's `filter()` and `join()` for efficient database queries
-3. **Lazy Loading**: Relationships use lazy loading (fetch on access) to avoid N+1 queries
-4. **Weighted Selection**: Creating a list with repeated entries for weighted selection is O(n) but acceptable for typical pool sizes (< 1000 courses)
-5. **JSON Parsing**: Preferences parsed on every route access - could be cached but overhead is minimal
-
-## Future Extensibility
-
-The architecture supports several potential enhancements:
-
-1. **Additional Terms**: New semester JSON files can be added and parsed automatically
-2. **New Requirement Types**: JSON-based Gen Ed system can be extended to other requirement categories
-3. **Recommendation Improvements**: Weighted selection algorithm can be refined with machine learning
-4. **Multi-User Features**: Database schema supports comparisons between users (not yet implemented)
-5. **Export Functionality**: Rankings can be exported as CSV/PDF using existing `ranking_position` field
-
-## Testing Considerations
-
-While not explicitly implemented, the architecture supports testing:
-
-- **Database**: Can use in-memory SQLite for test isolation
-- **Routes**: Flask test client can simulate requests
-- **Algorithms**: Pure functions (`rank_courses_binary_search`, `classify_level`) are easily unit testable
-- **Fixtures**: JSON course data can be used as test fixtures
 
 ---
 
