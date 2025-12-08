@@ -25,9 +25,63 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///classcupid.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 
-# Create tables
+
+def _run_migrations():
+    """Run database migrations to add missing columns to existing databases"""
+    from sqlalchemy import text, inspect
+    
+    try:
+        inspector = inspect(db.engine)
+        
+        # Get existing columns for each table
+        table_names = inspector.get_table_names()
+        users_columns = {col['name'] for col in inspector.get_columns('users')} if 'users' in table_names else set()
+        courses_columns = {col['name'] for col in inspector.get_columns('courses')} if 'courses' in table_names else set()
+        
+        with db.engine.connect() as conn:
+            # Migrations for users table
+            if 'affiliation' not in users_columns:
+                conn.execute(text("ALTER TABLE users ADD COLUMN affiliation VARCHAR(50)"))
+                conn.commit()
+            
+            if 'term_preference' not in users_columns:
+                conn.execute(text("ALTER TABLE users ADD COLUMN term_preference TEXT"))
+                conn.commit()
+            
+            if 'school_preferences' not in users_columns:
+                conn.execute(text("ALTER TABLE users ADD COLUMN school_preferences TEXT"))
+                conn.commit()
+            
+            # Migrations for courses table
+            if 'class_level_attribute' not in courses_columns:
+                conn.execute(text("ALTER TABLE courses ADD COLUMN class_level_attribute VARCHAR(100)"))
+                conn.commit()
+            
+            if 'class_level_attribute_description' not in courses_columns:
+                conn.execute(text("ALTER TABLE courses ADD COLUMN class_level_attribute_description VARCHAR(200)"))
+                conn.commit()
+            
+            if 'course_component' not in courses_columns:
+                conn.execute(text("ALTER TABLE courses ADD COLUMN course_component VARCHAR(100)"))
+                conn.commit()
+            
+            if 'subject_description' not in courses_columns:
+                conn.execute(text("ALTER TABLE courses ADD COLUMN subject_description VARCHAR(200)"))
+                conn.commit()
+            
+            if 'catalog_school_description' not in courses_columns:
+                conn.execute(text("ALTER TABLE courses ADD COLUMN catalog_school_description VARCHAR(200)"))
+                conn.commit()
+    except Exception as e:
+        # Silently fail - migrations are optional for new databases
+        pass
+
+
+# Create tables and run migrations
 with app.app_context():
     db.create_all()
+    # Run migrations to add any missing columns to existing databases
+    _run_migrations()
 
 
 @app.context_processor
@@ -313,103 +367,40 @@ def rank_courses_binary_search(courses, comparisons):
     return rankings
 
 
-def calculate_course_scores(rankings, total_courses):
-    """
-    Convert rankings (0-based) to scores (0-10 scale).
-    Best course (rank 0) gets 10, worst gets closer to 0.
-    Used internally for calculations only.
-    """
-    if not rankings or total_courses == 0:
-        return {}
-    
-    if total_courses == 1:
-        return {list(rankings.keys())[0]: 10}
-    
-    scores = {}
-    for course_id, rank in rankings.items():
-        # Linear mapping: rank 0 -> 10, rank (total-1) -> 0
-        # Best course gets 10, worst gets 0
-        score = 10 * (1 - rank / max(total_courses - 1, 1))
-        scores[course_id] = round(score, 1)
-    
-    return scores
-
-
-def format_ordinal(n):
-    """Convert number to ordinal string (1st, 2nd, 3rd, etc.)"""
-    if n is None:
-        return ""
-    suffix = ['th', 'st', 'nd', 'rd', 'th'][min(n % 10, 4)]
-    if 11 <= (n % 100) <= 13:
-        suffix = 'th'
-    return f"{n}{suffix}"
-
-
-def map_school_name_to_catalog_description(school_name):
-    """
-    Map school name from JSON to catalogSchoolDescription value in database.
-    
-    Args:
-        school_name: School name from harvard_schools.json
-    
-    Returns:
-        List of catalogSchoolDescription values to match (can be multiple for Business School)
-    """
-    # Special mappings for schools with different catalogSchoolDescription values
-    mapping = {
-        "Harvard Business School": ["Business School Doctoral", "Business School MBA"],
-        "Harvard School of Dental Medicine": ["School of Dental Medicine"],
-        "Harvard T.H. Chan School of Public Health": ["Harvard Chan School"],
-        "Harvard Graduate School of Education": ["Graduate School of Education"]
-    }
-    
-    # If there's a special mapping, return it
-    if school_name in mapping:
-        return mapping[school_name]
-    
-    # Otherwise, the school name should match the catalogSchoolDescription directly
-    return [school_name]
-
-
-def get_gened_course_codes_for_categories(selected_categories, term_preferences=None):
+def get_gened_course_codes_for_categories(selected_categories, term_preferences):
     """
     Load GenEds JSON and return a set of course codes (genEdCode) for the selected categories.
     
     Args:
         selected_categories: List of Gen Ed category names (e.g., ["Aesthetics & Culture"])
-        term_preferences: List of user's term preferences (e.g., ["2025 Fall", "2026 Spring"]) or single string for backward compatibility
+        term_preferences: List of user's term preferences (e.g., ["2025 Fall", "2026 Spring"])
     
     Returns:
         Set of course codes (e.g., {"GENED 1145", "GENED 1114"})
     """
     gened_course_codes = set()
     
-    # Map of requirement names to category names in GenEds JSON
-    category_map = {
-        "Science & Technology in Society": "Science & Technology in Society",
-        "Aesthetics & Culture": "Aesthetics & Culture",
-        "Ethics & Civics": "Ethics & Civics",
-        "Histories, Societies, Individuals": "Histories, Societies, Individuals"
+    # Valid Gen Ed categories (must match category names in GenEds JSON)
+    valid_gened_categories = {
+        "Science & Technology in Society",
+        "Aesthetics & Culture",
+        "Ethics & Civics",
+        "Histories, Societies, Individuals"
     }
     
     # Normalize term_preferences to a list
     if term_preferences is None:
-        term_preferences = []
+        return set()  # No terms provided, return empty set
     elif isinstance(term_preferences, str):
-        # Backward compatibility: single string
         term_preferences = [term_preferences]
     elif not isinstance(term_preferences, list):
-        term_preferences = []
-    
-    # If no terms specified, default to Fall 2025
-    if not term_preferences:
-        term_preferences = ["2025 Fall"]
+        return set()  # Invalid input, return empty set
     
     # Determine which GenEds JSON files to use based on term preferences
     geneds_files = []
     if "2026 Spring" in term_preferences:
         geneds_files.append('2026_Spring_Geneds.json')
-    if "2025 Fall" in term_preferences or not geneds_files:
+    if "2025 Fall" in term_preferences:
         geneds_files.append('2025_Fall_Geneds.json')
     
     try:
@@ -431,16 +422,14 @@ def get_gened_course_codes_for_categories(selected_categories, term_preferences=
             courses = geneds_data.get('courses', [])
             
             # For each selected category, find matching courses
-            for req_category in selected_categories:
-                if req_category not in category_map:
+            for category in selected_categories:
+                if category not in valid_gened_categories:
                     continue
-                
-                category_name = category_map[req_category]
                 
                 # Find all courses that have this category
                 for course in courses:
                     course_categories = course.get('categories', [])
-                    if category_name in course_categories:
+                    if category in course_categories:
                         gened_code = course.get('genEdCode', '')
                         if gened_code:
                             gened_course_codes.add(gened_code)
@@ -464,82 +453,90 @@ def filter_courses_for_other_affiliation(query, schools):
     Returns:
         Filtered SQLAlchemy query object
     """
-    from sqlalchemy import and_, or_
+    from sqlalchemy import or_
     
-    if not schools or len(schools) == 0:
+    if not schools:
         return query
     
-    # Build filter conditions for each selected school
+    # Mapping from user-facing school name to catalogSchoolDescription in database
+    # Note: GSAS uses "Faculty of Arts & Sciences" with post-query course number filtering
+    SCHOOL_TO_CATALOG = {
+        "Graduate School of Arts and Sciences": "Faculty of Arts & Sciences",
+        "Harvard School of Dental Medicine": "School of Dental Medicine",
+        "Harvard T.H. Chan School of Public Health": "Harvard Chan School",
+        "Graduate School of Design": "Graduate School of Design",
+        "Harvard Divinity School": "Harvard Divinity School",
+        "Harvard Graduate School of Education": "Graduate School of Education",
+        "Harvard Kennedy School": "Harvard Kennedy School",
+        "Harvard Law School": "Harvard Law School",
+        "Harvard Medical School": "Harvard Medical School",
+    }
+    
     school_filters = []
     
     for school in schools:
-        if school == "Graduate School of Arts and Sciences":
-            # Filter by catalogSchoolDescription = "Faculty of Arts & Sciences" 
-            # AND course number in ranges 300-399, 3000-3999, 200-299, 2000-2999
-            # Note: Course number filtering will be done post-query since we need to extract numeric values
-            school_filters.append(
-                Course.catalog_school_description == "Faculty of Arts & Sciences"
-            )
-        
-        elif school == "Harvard Business School":
-            # Filter by catalogSchoolDescription INCLUDES "Business School"
-            school_filters.append(
-                Course.catalog_school_description.like("%Business School%")
-            )
-        
-        elif school == "Harvard School of Dental Medicine":
-            # Filter by catalogSchoolDescription = "School of Dental Medicine"
-            school_filters.append(
-                Course.catalog_school_description == "School of Dental Medicine"
-            )
-        
-        elif school == "Harvard T.H. Chan School of Public Health":
-            # Filter by catalogSchoolDescription = "Harvard Chan School"
-            school_filters.append(
-                Course.catalog_school_description == "Harvard Chan School"
-            )
-        
-        elif school == "Graduate School of Design":
-            # Filter by catalogSchoolDescription = "Graduate School of Design"
-            school_filters.append(
-                Course.catalog_school_description == "Graduate School of Design"
-            )
-        
-        elif school == "Harvard Divinity School":
-            # Filter by catalogSchoolDescription = "Harvard Divinity School"
-            school_filters.append(
-                Course.catalog_school_description == "Harvard Divinity School"
-            )
-        
-        elif school == "Harvard Graduate School of Education":
-            # Filter by catalogSchoolDescription = "Graduate School of Education"
-            school_filters.append(
-                Course.catalog_school_description == "Graduate School of Education"
-            )
-        
-        elif school == "Harvard Kennedy School":
-            # Filter by catalogSchoolDescription = "Harvard Kennedy School"
-            school_filters.append(
-                Course.catalog_school_description == "Harvard Kennedy School"
-            )
-        
-        elif school == "Harvard Law School":
-            # Filter by catalogSchoolDescription = "Harvard Law School"
-            school_filters.append(
-                Course.catalog_school_description == "Harvard Law School"
-            )
-        
-        elif school == "Harvard Medical School":
-            # Filter by catalogSchoolDescription = "Harvard Medical School"
-            school_filters.append(
-                Course.catalog_school_description == "Harvard Medical School"
-            )
+        if school == "Harvard Business School":
+            # Business School uses LIKE query (matches "Business School Doctoral", "Business School MBA", etc.)
+            school_filters.append(Course.catalog_school_description.like("%Business School%"))
+        elif school in SCHOOL_TO_CATALOG:
+            school_filters.append(Course.catalog_school_description == SCHOOL_TO_CATALOG[school])
     
-    # Combine all school filters with OR (user can select multiple schools)
     if school_filters:
         query = query.filter(or_(*school_filters))
     
     return query
+
+
+def exclude_tutorials(query):
+    """
+    Helper function to exclude Tutorial courses from a query.
+    Filters out courses with component="Tutorial" or "Tutorial" in title.
+    """
+    query = query.filter(
+        or_(
+            Course.course_component.is_(None),
+            Course.course_component != "Tutorial"
+        )
+    )
+    query = query.filter(
+        or_(
+            Course.course_title.is_(None),
+            ~Course.course_title.ilike("%Tutorial%")
+        )
+    )
+    return query
+
+
+def map_concentration_to_department(concentration):
+    """
+    Map concentration name from harvard_college_concentrations.json to 
+    catalogSubjectDescription value used in the database.
+    
+    Some concentrations have different names than their catalogSubjectDescription.
+    Returns the department name to use for filtering.
+    """
+    # Mapping of concentration names to catalogSubjectDescription values
+    # Some concentrations have different names than their catalogSubjectDescription
+    concentration_to_department = {
+        "Applied Math": "Applied Mathematics",
+        "Classics": "Classics, The",
+        "Comparative Study of Religion": "Religion, The Study of",
+        "Germanic Languages and Literature": "Germanic Languages and Literatures",
+        "History and Science": "History of Science",
+        "Romance Languages and Literature": "Romance Languages and Literatures",
+        "Slavic Literatures and Cultures": "Slavic Languages and Literatures",
+        "Studies of Women, Gender, and Sexuality": "Women, Gender, and Sexuality, Studies of",
+    }
+    
+    # Return mapped value if exists, otherwise return original
+    return concentration_to_department.get(concentration, concentration)
+
+
+def is_fysemr_course(course):
+    """
+    Check if a course is a First Year Seminar (FYSEMR) course.
+    """
+    return course.course_number and course.course_number.startswith("FYSEMR")
 
 
 def recommend_course_weighted(user, seen_course_ids):
@@ -552,13 +549,9 @@ def recommend_course_weighted(user, seen_course_ids):
     if seen_course_ids:
         query = query.filter(~Course.id.in_(seen_course_ids))
     
-    # Filter by term preference (required for all users)
+    # Filter by term preference (required - enforced by profile page)
     user_terms = user.get_terms()
-    if user_terms:
-        query = query.filter(Course.term_description.in_(user_terms))
-    else:
-        # If no term preference set, default to "2025 Fall" for backward compatibility
-        query = query.filter(Course.term_description == "2025 Fall")
+    query = query.filter(Course.term_description.in_(user_terms))
     
     # Filter by affiliation
     if user.affiliation == "Harvard College":
@@ -587,28 +580,36 @@ def recommend_course_weighted(user, seen_course_ids):
             if seen_course_ids:
                 fysemr_query = fysemr_query.filter(~Course.id.in_(seen_course_ids))
             
-            # Filter by term preference
-            if user_terms:
-                fysemr_query = fysemr_query.filter(Course.term_description.in_(user_terms))
-            else:
-                fysemr_query = fysemr_query.filter(Course.term_description == "2025 Fall")
+            # Filter by term preference (required - enforced by profile page)
+            fysemr_query = fysemr_query.filter(Course.term_description.in_(user_terms))
             
             # Filter for FYSEMR courses (course_number starts with "FYSEMR")
             fysemr_query = fysemr_query.filter(Course.course_number.like("FYSEMR%"))
             
             # Get FYSEMR courses (no concentration or level filtering)
             fysemr_courses = fysemr_query.all()
+            
+            # If First Year Seminar is the ONLY requirement and no concentrations selected,
+            # return ONLY FYSEMR courses (don't run the main query which would return everything)
+            if not concentrations and not requirements:
+                if not fysemr_courses:
+                    return None
+                return random.choice(fysemr_courses)
         else:
             fysemr_courses = []
         
-        # Filter by concentration (if selected) - for the main query path
-        # If 0 concentrations selected, show all courses
+        # Build main filter conditions - these will be OR'd together
+        # This allows: "Statistics courses OR Aesthetics & Culture Gen Eds OR Arts & Humanities courses"
+        main_filter_conditions = []
+        
+        # Add concentration filter (department)
+        # Map concentration names to actual department names in database
         if concentrations:
-            query = query.filter(Course.department.in_(concentrations))
+            mapped_departments = [map_concentration_to_department(conc) for conc in concentrations]
+            main_filter_conditions.append(Course.department.in_(mapped_departments))
         
         # Filter by requirements (if selected)
         if requirements:
-            req_conditions = []
             req_map = {
                 "Science & Technology in Society": Course.science_and_technology_in_society,
                 "Aesthetics & Culture": Course.aesthetics_and_culture,
@@ -638,88 +639,57 @@ def recommend_course_weighted(user, seen_course_ids):
                 gened_course_codes = get_gened_course_codes_for_categories(selected_gened_categories, user_terms)
                 has_gened_codes = len(gened_course_codes) > 0
             
-            # Filter by Gen Ed course codes if any were found
-            # This ensures we only show the specific courses from the GenEds JSON
+            # Add Gen Ed course codes to main filter conditions
             if gened_course_codes:
-                query = query.filter(Course.course_number.in_(gened_course_codes))
+                main_filter_conditions.append(Course.course_number.in_(gened_course_codes))
             elif selected_gened_categories:
                 # If Gen Ed categories selected but no codes found, use flag-based filtering as fallback
                 for req in selected_gened_categories:
                     if req in req_map:
-                        req_conditions.append(req_map[req] == True)
+                        main_filter_conditions.append(req_map[req] == True)
             
-            # Handle other requirements (non-Gen Ed) using flag-based filtering
+            # Add other requirements (non-Gen Ed) to main filter conditions
             for req in other_requirements:
                 if req in req_map:
-                    # Skip language requirement in the OR filter - we'll identify language courses by pattern
+                    # Skip language requirement here - handled separately via pattern matching
                     if req != "Language Requirement":
-                        req_conditions.append(req_map[req] == True)
-            
-            # Apply other requirements filtering (these work in addition to Gen Ed codes if both are present)
-            if req_conditions:
-                query = query.filter(or_(*req_conditions))
-            
-            # Divisional distribution requirements (exclude Tutorials)
-            divisional_requirements = {
-                "Arts and Humanities",
-                "Social Sciences",
-                "Science and Engineering and Applied Science"
-            }
-            has_divisional_dist = any(req in divisional_requirements for req in requirements)
-            
-            # Handle language requirement specially - identify by course number pattern
-            # Language courses will be filtered later by level (1, 2, 3, A, B)
-            
-            # Exclude Tutorial courses when filtering by divisional distribution
-            if has_divisional_dist:
-                query = query.filter(
-                    or_(
-                        Course.course_component.is_(None),
-                        Course.course_component != "Tutorial"
-                    )
-                )
-                # Also exclude courses with "Tutorial" in the title
-                query = query.filter(
-                    or_(
-                        Course.course_title.is_(None),
-                        ~Course.course_title.ilike("%Tutorial%")
-                    )
-                )
+                        main_filter_conditions.append(req_map[req] == True)
         
-        # Note: has_gened_codes and gened_course_codes are already defined above if requirements were selected
+        # Apply all main filters with OR logic
+        # Result: "concentration courses OR Gen Ed courses OR divisional dist courses"
+        if main_filter_conditions:
+            query = query.filter(or_(*main_filter_conditions))
         
-        # Rule 1: First year seminars only for freshmen
+        # Divisional distribution requirements (exclude Tutorials)
+        # This must be independent of main_filter_conditions to work correctly
+        divisional_requirements = {
+            "Arts and Humanities",
+            "Social Sciences",
+            "Science and Engineering and Applied Science"
+        }
+        has_divisional_dist = requirements and any(req in divisional_requirements for req in requirements)
+        
+        # Exclude Tutorial courses when filtering by divisional distribution
+        if has_divisional_dist:
+            query = exclude_tutorials(query)
+        
+        # Exclude tutorials for freshmen (they can't take any tutorials)
         # Skip this filtering for Gen Ed courses (they're open to all grades)
-        if not has_gened_codes:
-            if year == "Freshman":
-                # Freshmen can see first year seminars
-                # Exclude all tutorials (component-based filtering)
-                query = query.filter(
-                    or_(
-                        Course.course_component.is_(None),
-                        Course.course_component != "Tutorial"
-                    )
-                )
-                # Also exclude courses with "Tutorial" in the title
-                query = query.filter(
-                    or_(
-                        Course.course_title.is_(None),
-                        ~Course.course_title.ilike("%Tutorial%")
-                    )
-                )
-            else:
-                # Upperclassmen cannot see first year seminars
-                query = query.filter(
-                    or_(
-                        Course.subject_description.is_(None),
-                        Course.subject_description != "First Year Seminar"
-                    )
-                )
+        if not has_gened_codes and year == "Freshman":
+            query = exclude_tutorials(query)
+        # Note: First Year Seminars are handled via weighting (weight=0 for non-freshmen)
         
         # Note: Graduate courses are no longer excluded - they're just weighted smaller
         
         # Get all eligible courses
-        eligible_courses = query.all()
+        # Note: We need all courses for the weighting algorithm to work correctly.
+        # Add a safety limit to prevent memory issues with overly broad filters.
+        MAX_COURSES = 20000
+        eligible_courses = query.limit(MAX_COURSES).all()
+        
+        if len(eligible_courses) >= MAX_COURSES:
+            # If we hit the limit, the filters may be too broad - log a warning
+            print(f"Warning: Query returned {MAX_COURSES} courses (limit reached). Consider refining filters.")
         
         # Combine FYSEMR courses with eligible courses (union logic)
         # If First Year Seminar is selected, include FYSEMR courses regardless of concentration
@@ -737,14 +707,9 @@ def recommend_course_weighted(user, seen_course_ids):
         # Skip all grade-level filtering for Gen Ed courses (they're open to all grades)
         filtered_courses = []
         for course in eligible_courses:
-            # Check if this is a FYSEMR course (First Year Seminar)
-            is_fysemr_course = course.course_number and course.course_number.startswith("FYSEMR")
-            
-            # Rule: ONLY freshmen are allowed to have first year seminars
-            if is_fysemr_course:
-                if year == "Freshman":
-                    filtered_courses.append(course)
-                # Skip FYSEMR courses for all other years
+            # Let FYSEMR courses pass through to weighting (handled there via weight=0 for non-freshmen)
+            if is_fysemr_course(course):
+                filtered_courses.append(course)
                 continue
             # Check if this is a Gen Ed course - if so, skip all grade-level filtering
             is_gened_course = has_gened_codes and course.course_number in gened_course_codes
@@ -833,6 +798,13 @@ def recommend_course_weighted(user, seen_course_ids):
         year_lower = year.lower() if year else None
         
         for course in filtered_courses:
+            # Handle FYSEMR courses: only freshmen get weight, others get 0
+            if is_fysemr_course(course):
+                if year_lower == "freshman":
+                    weighted_pool.extend([course] * 3)  # Weight of 3 for freshmen
+                # Non-freshmen get weight 0 (not added to pool)
+                continue
+            
             level = course.classify_level()
             weight = 0
             
@@ -842,10 +814,10 @@ def recommend_course_weighted(user, seen_course_ids):
                 elif level == "UG_mid":
                     weight = 2  # Moderate weight on UG_mid (100-199, 1100-1999)
                 elif level == "Alpha":
-                    weight = 5  # Alpha courses available to all
+                    weight = 4  # Alpha courses available to all
                 # NO Grad_low or Grad_research for freshmen
                 # NO tutorials, special seminars, or reading research for freshmen
-                # First year seminars are included via FYSEMR filter
+                # First year seminars are handled above (weight=3 for freshmen)
             
             elif year_lower == "sophomore":
                 if level == "UG_intro":
@@ -859,7 +831,7 @@ def recommend_course_weighted(user, seen_course_ids):
                 elif level == "ReadingResearch":  # 91, 910
                     weight = 2
                 elif level == "Alpha":
-                    weight = 5  # Same across all years
+                    weight = 4  # Same across all years
                 # NO Grad_low or Grad_research for sophomores
             
             elif year_lower == "junior":
@@ -876,7 +848,7 @@ def recommend_course_weighted(user, seen_course_ids):
                 elif level == "ReadingResearch":  # 91, 910
                     weight = 2
                 elif level == "Alpha":
-                    weight = 5  # Same across all years
+                    weight = 4  # Same across all years
                 # NO Grad_research for juniors
             
             elif year_lower == "senior":
@@ -893,29 +865,8 @@ def recommend_course_weighted(user, seen_course_ids):
                 elif level == "ReadingResearch":  # 91, 910
                     weight = 2
                 elif level == "Alpha":
-                    weight = 5  # Same across all years
+                    weight = 4  # Same across all years
                 # NO Grad_research for seniors
-            
-            # Check if course is a graduate course by attributes (if not already classified by level)
-            # This catches courses identified by PRIMGRAD/GRADCOURSE attributes that weren't caught by level classification
-            is_grad_by_attr = False
-            if level not in ["Grad_low", "Grad_research"]:
-                if course.class_level_attribute and course.class_level_attribute in ["PRIMGRAD", "GRADCOURSE"]:
-                    is_grad_by_attr = True
-                elif course.class_level_attribute_description and "Graduate" in course.class_level_attribute_description:
-                    is_grad_by_attr = True
-            
-            # If it's a graduate course not already weighted, apply small weight based on year
-            # But only for Grad_low, not Grad_research (which should never be weighted for undergrads)
-            if is_grad_by_attr and weight == 0:
-                if year_lower == "freshman":
-                    weight = 0  # No graduate courses for freshmen
-                elif year_lower == "sophomore":
-                    weight = 0  # No graduate courses for sophomores
-                elif year_lower == "junior":
-                    weight = 2  # Small weight for grad courses by attribute
-                elif year_lower == "senior":
-                    weight = 3  # Small-medium weight for grad courses by attribute
             
             # Add course to pool with its weight
             if weight > 0:

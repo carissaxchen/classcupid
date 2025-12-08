@@ -25,49 +25,35 @@ class User(db.Model):
     course_preferences = db.relationship('UserCoursePreference', backref='user', lazy=True, cascade='all, delete-orphan')
     sort_comparisons = db.relationship('SortComparison', backref='user', lazy=True, cascade='all, delete-orphan')
     
-    def get_concentrations(self):
-        """Parse concentration preferences from JSON or comma-separated string"""
-        if not self.concentration_preferences:
+    def _parse_json_or_comma_separated(self, value):
+        """Helper method to parse JSON or comma-separated string"""
+        if not value:
             return []
         try:
-            return json.loads(self.concentration_preferences)
-        except:
-            return [c.strip() for c in self.concentration_preferences.split(',') if c.strip()]
+            parsed = json.loads(value)
+            if isinstance(parsed, list):
+                return parsed
+            # If it's a single value, return as list
+            return [parsed] if parsed else []
+        except (json.JSONDecodeError, ValueError, TypeError):
+            # Fall back to comma-separated parsing
+            return [item.strip() for item in value.split(',') if item.strip()]
+    
+    def get_concentrations(self):
+        """Parse concentration preferences from JSON or comma-separated string"""
+        return self._parse_json_or_comma_separated(self.concentration_preferences)
     
     def get_requirements(self):
         """Parse requirement preferences from JSON or comma-separated string"""
-        if not self.requirement_preferences:
-            return []
-        try:
-            return json.loads(self.requirement_preferences)
-        except:
-            return [r.strip() for r in self.requirement_preferences.split(',') if r.strip()]
+        return self._parse_json_or_comma_separated(self.requirement_preferences)
     
     def get_schools(self):
         """Parse school preferences from JSON or comma-separated string"""
-        if not self.school_preferences:
-            return []
-        try:
-            return json.loads(self.school_preferences)
-        except:
-            return [s.strip() for s in self.school_preferences.split(',') if s.strip()]
+        return self._parse_json_or_comma_separated(self.school_preferences)
     
     def get_terms(self):
-        """Parse term preferences from JSON or single string (for backward compatibility)"""
-        if not self.term_preference:
-            return []
-        try:
-            # Try to parse as JSON array
-            terms = json.loads(self.term_preference)
-            if isinstance(terms, list):
-                return terms
-            # If it's a single string, return as list
-            return [terms] if terms else []
-        except:
-            # Backward compatibility: treat as single string or comma-separated
-            if ',' in self.term_preference:
-                return [t.strip() for t in self.term_preference.split(',') if t.strip()]
-            return [self.term_preference] if self.term_preference else []
+        """Parse term preferences from JSON or comma-separated string"""
+        return self._parse_json_or_comma_separated(self.term_preference)
 
 
 class Course(db.Model):
@@ -115,19 +101,10 @@ class Course(db.Model):
         db.UniqueConstraint('course_id', 'term_description', name='unique_course_term'),
     )
     
-    def get_quotes(self):
-        """Get quotes as a list"""
-        if not self.quotes_json:
-            return []
-        try:
-            return json.loads(self.quotes_json)
-        except:
-            return []
-    
-    def get_days_display(self):
-        """Convert days_of_week string to display format"""
+    def _get_days_set(self):
+        """Parse days_of_week into a set of day abbreviations (cached parsing)"""
         if not self.days_of_week:
-            return ""
+            return set()
         day_map = {
             'M': 'M', 'Monday': 'M',
             'T': 'T', 'Tuesday': 'T',
@@ -138,21 +115,19 @@ class Course(db.Model):
             'Su': 'Su', 'Sunday': 'Su'
         }
         days = self.days_of_week.split(',')
-        return ''.join([day_map.get(d.strip(), d.strip()[0] if d.strip() else '') for d in days if d.strip()])
+        return {day_map.get(d.strip(), d.strip()[0] if d.strip() else '') for d in days if d.strip()}
+    
+    def get_days_display(self):
+        """Convert days_of_week string to display format"""
+        days_set = self._get_days_set()
+        # Sort days for consistent display order
+        day_order = ['Su', 'M', 'T', 'W', 'Th', 'F', 'S']
+        sorted_days = [day for day in day_order if day in days_set]
+        return ''.join(sorted_days)
     
     def has_day(self, day_abbr):
         """Check if course meets on a specific day"""
-        days_str = self.get_days_display()
-        if not days_str:
-            return False
-        if day_abbr == 'M':
-            # Check for M but not Th (Thursday contains T and H)
-            return 'M' in days_str and not days_str.startswith('Th')
-        elif day_abbr == 'T':
-            # Check for T but not Th
-            return 'T' in days_str and 'Th' not in days_str
-        else:
-            return day_abbr in days_str
+        return day_abbr in self._get_days_set()
     
     def extract_course_number(self):
         """Extract numeric course number from course_number field (e.g., 'COMPSCI 50' -> 50, 'ARABIC A' -> None)"""
@@ -180,11 +155,30 @@ class Course(db.Model):
     
     def classify_level(self):
         """Classify course difficulty level based on course numbering system"""
+        # Check if it's a Gen Ed course first (these should be treated as Alpha)
+        if self.course_number and self.course_number.upper().startswith("GENED"):
+            return "Alpha"  # Gen Ed courses are open to all years, same as Alpha courses
+        
+        # Check course attributes first (more authoritative than course number)
+        # These attributes explicitly mark courses as graduate-level regardless of number
+        if self.class_level_attribute:
+            if self.class_level_attribute == "PRIMGRAD":
+                return "Grad_low"  # Primarily graduate course
+            elif self.class_level_attribute == "GRADCOURSE":
+                return "Grad_research"  # Graduate research course
+        
+        # Fall back to class_level_attribute_description if attribute not set
+        if self.class_level_attribute_description and "Graduate" in self.class_level_attribute_description:
+            return "Grad_low"  # Default to Grad_low if description indicates graduate
+        
+        # Now check course number
         num = self.extract_course_number()
         if num is None:
             # Check if it's an alpha course (e.g., "Arabic A", "English Crr")
-            if self.course_number and any(c.isalpha() for c in self.course_number.split()[-1] if self.course_number.split()):
-                return "Alpha"  # Alpha courses can be selected by any year
+            if self.course_number:
+                parts = self.course_number.split()
+                if parts and any(c.isalpha() for c in parts[-1]):
+                    return "Alpha"  # Alpha courses can be selected by any year
             return "Unknown"
         
         # Special tutorial categories
