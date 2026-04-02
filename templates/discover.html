@@ -149,7 +149,51 @@
                 </div>
             </div>
         </div>
+        {% if discover_pct is not none %}
+        <div class="discover-progress-wrap discover-progress-wrap--below-card" title="Share of courses in your filter you have already swiped on">
+            <div class="discover-progress-track" aria-hidden="true"><div class="discover-progress-fill" style="width: {{ discover_pct }}%"></div></div>
+            <span class="discover-progress-text">{{ discover_pct }}%</span>
+        </div>
+        {% endif %}
     {% endif %}
 </div>
+
+{% if course %}
+<div class="welcome-popup hidden" id="rankHintPopup" role="dialog" aria-labelledby="rankHintTitle">
+    <div class="welcome-popup-content rank-hint-popup">
+        {% if discover_pct is not none %}
+        <div class="rank-hint-progress-bar" aria-hidden="true">
+            <div class="rank-hint-progress-fill" style="width: {{ discover_pct }}%"></div>
+        </div>
+        {% endif %}
+        <h2 id="rankHintTitle">Rank your matches</h2>
+        <p>You have saved several courses. Head to <strong>Matches</strong> to compare pairs and build your ranked list.</p>
+        <div class="rank-hint-buttons">
+            <button type="button" class="btn btn-secondary rank-hint-dismiss" onclick="dismissRankHintPopup()">Maybe later</button>
+            <a href="{{ url_for('matches') }}" class="btn btn-primary rank-hint-primary">Go to Matches</a>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    var saved = {{ saved_matches_count|default(0) }};
+    function tryShowRankHint() {
+        var el = document.getElementById('rankHintPopup');
+        if (!el || saved < 5) return;
+        if (sessionStorage.getItem('classcupid_rank_hint_dismissed') === '1') return;
+        el.classList.remove('hidden');
+    }
+    window.dismissRankHintPopup = function() {
+        sessionStorage.setItem('classcupid_rank_hint_dismissed', '1');
+        var el = document.getElementById('rankHintPopup');
+        if (el) el.classList.add('hidden');
+    };
+    document.addEventListener('DOMContentLoaded', tryShowRankHint);
+})();
+</script>
 {% endblock %}
 

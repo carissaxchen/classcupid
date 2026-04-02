@@ -3,6 +3,17 @@
 {% block title %}Matches - Class Cupid{% endblock %}
 
 {% block content %}
+{% if show_scroll_rankings_popup %}
+<div class="welcome-popup" id="scrollRankingsPopup" role="dialog">
+    <div class="welcome-popup-content scroll-hint-popup">
+        <h2>Your rankings are ready</h2>
+        <p>Scroll down to the <strong>Saved Classes</strong> section to see your ranked list. You can drag rows to tweak the order.</p>
+        <form method="POST" action="{{ url_for('dismiss_scroll_rankings_hint') }}" class="scroll-hint-actions">
+            <button type="submit" class="btn btn-primary">Got it</button>
+        </form>
+    </div>
+</div>
+{% endif %}
 <div class="matches-container">
     <h1>Matches</h1>
     
@@ -51,14 +62,14 @@
                 </div>
             </form>
         </div>
-        <div class="comparison-actions">
+        <div class="comparison-actions comparison-actions-compact">
             <form method="POST" action="{{ url_for('undo_comparison') }}" class="action-form">
-                <button type="submit" class="btn btn-action">← Undo</button>
+                <button type="submit" class="btn btn-comparison-secondary" title="Undo last comparison">Undo</button>
             </form>
             <form method="POST" action="{{ url_for('skip_comparison') }}" class="action-form">
                 <input type="hidden" name="course1_id" value="{{ comparison_pair[0].id }}">
                 <input type="hidden" name="course2_id" value="{{ comparison_pair[1].id }}">
-                <button type="submit" class="btn btn-action">Skip →</button>
+                <button type="submit" class="btn btn-comparison-secondary" title="Skip this pair">Skip</button>
             </form>
         </div>
     </div>
@@ -97,6 +108,9 @@
             {% set term_min = min_comparisons_by_term.get(term, 0) %}
             <div class="term-group">
                 <h3 class="term-heading">{{ term }}</h3>
+                {% if term_show_ranked %}
+                <p class="rank-drag-hint">Drag rows to reorder your list.</p>
+                {% endif %}
                 {% if not term_show_ranked and term_count > 0 %}
                 <div class="term-progress-message">
                     <p>{{ term_count }}/{{ term_min }} comparisons made for this semester. Keep ranking to see your ranked list!</p>
@@ -120,9 +134,9 @@
                             <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="{% if term_show_ranked %}ranked-tbody sortable-ranked{% endif %}" data-term="{{ term|e }}" {% if term_show_ranked %}data-draggable="1"{% endif %}>
                         {% for pref in prefs %}
-                        <tr>
+                        <tr data-course-id="{{ pref.course.id }}" class="{% if term_show_ranked %}rank-sortable-row{% endif %}">
                             {% if term_show_ranked %}
                             <td class="ranking-cell">
                                 {% if pref.ranking_position %}
@@ -180,4 +194,8 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/matches.js') }}"></script>
 {% endblock %}
