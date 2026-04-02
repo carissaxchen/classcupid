@@ -11,7 +11,7 @@
     <nav class="navbar">
         <div class="nav-container">
             <div class="nav-logo">
-                <a href="{{ url_for('discover') if current_user else url_for('login') }}" class="logo-link">
+                <a href="{{ url_for('discover') if profile and profile.get('affiliation') else url_for('profile') }}" class="logo-link">
                     <img src="{{ url_for('static', filename='images/Class Cupid Logo V3-3.png') }}" alt="Class Cupid" class="logo-image">
                 </a>
                 <img src="{{ url_for('static', filename='images/Class Cupid Text-4.png') }}" alt="Class Cupid" class="logo-text-image">
@@ -27,15 +27,11 @@
                 </a>
             </div>
             <div class="nav-auth">
-                {% if current_user %}
+                {% if profile and profile.get('affiliation') %}
                     <a href="{{ url_for('profile') }}" class="nav-link">
                         <img src="{{ url_for('static', filename='images/icons/user-circle.svg') }}" alt="" class="nav-icon">
-                        <span>{{ current_user.username }}</span>
+                        <span>Preferences</span>
                     </a>
-                    <a href="{{ url_for('logout') }}" class="nav-link">Logout</a>
-                {% else %}
-                    <a href="{{ url_for('login') }}" class="nav-link">Login</a>
-                    <a href="{{ url_for('register') }}" class="nav-link">Register</a>
                 {% endif %}
             </div>
         </div>
@@ -70,4 +66,3 @@
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
-

@@ -1,46 +1,129 @@
 import os
 import json
 import random
-from datetime import datetime
-from flask import Flask, flash, redirect, render_template, request, session
-from flask_session import Session
-from werkzeug.security import check_password_hash, generate_password_hash
-from sqlalchemy import func, or_, and_
+import re
+import shutil
+from pathlib import Path
+
+from flask import Flask, flash, redirect, render_template, request, session, url_for
+from sqlalchemy import and_, or_
 import click
 
-from helpers import apology, login_required
-from models import db, User, Course, UserCoursePreference, SortComparison
+from helpers import (
+    apology,
+    extract_meeting_fields,
+    filter_published_instructor_names,
+    profile_complete,
+)
+from models import db, Course
 
-# Configure application
+
+def _database_uri():
+    root_dir = Path(__file__).resolve().parent
+    bundled = root_dir / "catalog.db"
+    if os.environ.get("VERCEL"):
+        tmp = Path("/tmp") / "classcupid_catalog.db"
+        if bundled.is_file() and not tmp.is_file():
+            shutil.copy(bundled, tmp)
+        return f"sqlite:///{tmp}"
+    return f"sqlite:///{root_dir / 'catalog.db'}"
+
+
 app = Flask(__name__)
-
-# Configure session to use filesystem (instead of signed cookies)
-app.config["SESSION_PERMANENT"] = False
-app.config["SESSION_TYPE"] = "filesystem"
-Session(app)
-
-# Configure SQLAlchemy
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///classcupid.db"
+app.config["SQLALCHEMY_DATABASE_URI"] = _database_uri()
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-for-production")
+
 db.init_app(app)
 
-# Create all database tables
+MAX_SESSION_PREFS = 400
+
 with app.app_context():
     db.create_all()
 
 
+class ProfileProxy:
+    def __init__(self, data):
+        self._d = data or {}
+
+    @property
+    def affiliation(self):
+        return self._d.get("affiliation")
+
+    @property
+    def year(self):
+        return self._d.get("year")
+
+    def get_terms(self):
+        t = self._d.get("terms")
+        if not t:
+            return []
+        return t if isinstance(t, list) else [t]
+
+    def get_concentrations(self):
+        c = self._d.get("concentrations")
+        return c or []
+
+    def get_requirements(self):
+        r = self._d.get("requirements")
+        return r or []
+
+    def get_schools(self):
+        s = self._d.get("schools")
+        return s or []
+
+
+class ComparisonRef:
+    __slots__ = ("winner_course_id", "loser_course_id")
+
+    def __init__(self, w, l):
+        self.winner_course_id = w
+        self.loser_course_id = l
+
+
+class SavedPref:
+    def __init__(self, course, status):
+        self.course = course
+        self.status = status
+        self.ranking_position = None
+
+
+def _course_prefs():
+    return session.setdefault("course_prefs", {})
+
+
+def _swipe_stack():
+    return session.setdefault("swipe_stack", [])
+
+
+def _comparisons_list():
+    return session.setdefault("comparisons", [])
+
+
+def _trim_session_prefs():
+    prefs = _course_prefs()
+    stack = _swipe_stack()
+    while len(prefs) > MAX_SESSION_PREFS and stack:
+        oldest = stack.pop(0)
+        prefs.pop(str(oldest), None)
+    session.modified = True
+
+
+def _seen_course_ids():
+    return [int(k) for k in _course_prefs().keys()]
+
+
+def _comparisons_as_refs():
+    return [ComparisonRef(a[0], a[1]) for a in _comparisons_list()]
+
+
 @app.context_processor
-def inject_user():
-    """Make current user available to all templates"""
-    if session.get("user_id"):
-        user = User.query.get(session["user_id"])
-        return dict(current_user=user)
-    return dict(current_user=None)
+def inject_globals():
+    return dict(profile=session.get("profile"))
 
 
 @app.after_request
 def after_request(response):
-    """Ensure responses aren't cached"""
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Expires"] = 0
     response.headers["Pragma"] = "no-cache"
@@ -48,179 +131,67 @@ def after_request(response):
 
 
 @app.route("/")
-@login_required
 def index():
-    """Redirect to discover page"""
-    return redirect("/discover")
-
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    """Log user in"""
-    # Forget any user_id
-    session.clear()
-
-    # User reached route via POST (as by submitting a form via POST)
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-        
-        # Ensure username was submitted
-        if not username:
-            flash("Please provide a username", "error")
-            return render_template("login.html", username=username)
-        
-        # Ensure password was submitted
-        if not password:
-            flash("Please provide a password", "error")
-            return render_template("login.html", username=username)
-        
-        # Query database for username
-        user = User.query.filter_by(username=username).first()
-        
-        # Ensure username exists and password is correct
-        if not user or not check_password_hash(user.password_hash, password):
-            flash("Invalid username and/or password", "error")
-            return render_template("login.html", username=username)
-        
-        # Remember which user has logged in
-        session["user_id"] = user.id
-        
-        # Redirect user to discover page
-        return redirect("/discover")
-    
-    # User reached route via GET (as by clicking a link or via redirect)
-    return render_template("login.html")
-
-
-@app.route("/logout")
-def logout():
-    """Log user out"""
-    # Forget any user_id
-    session.clear()
-    # Redirect user to login form
-    return redirect("/login")
-
-
-@app.route("/register", methods=["GET", "POST"])
-def register():
-    """Register user"""
-    if request.method == "POST":
-        if not request.form.get("username"):
-            return apology("must provide username", 400)
-
-        # Ensure password was submitted
-        elif not request.form.get("password"):
-            return apology("must provide password", 400)
-
-        # Ensure confirmed password was submitted
-        elif not request.form.get("confirmation"):
-            return apology("must provide password confirmation", 400)
-
-        # Ensure confirmed password matches
-        elif request.form.get("password") != request.form.get("confirmation"):
-            return apology("passwords must match", 400)
-
-        # Check if username already exists
-        if User.query.filter_by(username=request.form.get("username")).first():
-            return apology("username is already taken", 400)
-
-        # Create new user
-        user = User(
-            username=request.form.get("username"),
-            password_hash=generate_password_hash(request.form.get("password"))
-        )
-        db.session.add(user)
-        db.session.commit()
-
-        # Set current session to user
-        session["user_id"] = user.id
-
-        # Redirect user to profile to set preferences
-        return redirect("/profile")
-
-    else:
-        return render_template("register.html")
+    p = session.get("profile") or {}
+    if p.get("affiliation"):
+        return redirect(url_for("discover"))
+    return redirect(url_for("profile"))
 
 
 @app.route("/profile", methods=["GET", "POST"])
-@login_required
 def profile():
-    """User profile and preferences"""
-    user = User.query.get(session["user_id"])
-    
-    # Handle case where user doesn't exist (e.g., after database recreation)
-    if not user:
-        session.clear()
-        flash("Your session has expired. Please log in again.", "error")
-        return redirect("/login")
-
     if request.method == "POST":
-        # Get form data
         terms = request.form.getlist("terms")
         affiliation = request.form.get("affiliation")
         year = request.form.get("year")
         concentrations = request.form.getlist("concentrations")
         requirements = request.form.getlist("requirements")
         schools = request.form.getlist("schools")
-        
-        # Update user preferences
-        # Store terms as JSON array
-        user.term_preference = json.dumps(terms) if terms else None
-        user.affiliation = affiliation
-        user.year = year if affiliation == "Harvard College" else None
-        # Allow 0 concentrations - user can select only requirements
-        user.concentration_preferences = json.dumps(concentrations) if affiliation == "Harvard College" else None
-        user.requirement_preferences = json.dumps(requirements) if requirements and affiliation == "Harvard College" else None
-        user.school_preferences = json.dumps(schools) if schools and affiliation == "Other" else None
-        
-        db.session.commit()
+        session["profile"] = {
+            "terms": terms,
+            "affiliation": affiliation,
+            "year": year if affiliation == "Harvard College" else None,
+            "concentrations": concentrations if affiliation == "Harvard College" else [],
+            "requirements": requirements if affiliation == "Harvard College" else [],
+            "schools": schools if affiliation == "Other" else [],
+        }
+        session.modified = True
         flash("Preferences saved!")
-        return redirect("/discover")
-    
-    # GET request - show profile form
-    # Load JSON files for options
+        return redirect(url_for("discover"))
+    root = Path(__file__).resolve().parent
     try:
-        with open('data/json/harvard_college_concentrations.json', 'r') as f:
+        with open(root / "data/json/harvard_college_concentrations.json", "r") as f:
             harvard_concentrations = json.load(f)
-    except:
+    except OSError:
         harvard_concentrations = []
-    
     try:
-        with open('data/json/harvard_schools.json', 'r') as f:
+        with open(root / "data/json/harvard_schools.json", "r") as f:
             harvard_schools = json.load(f)
-    except:
+    except OSError:
         harvard_schools = []
-    
-    # Get user's current preferences
-    user_concentrations = user.get_concentrations() if user else []
-    user_requirements = user.get_requirements() if user else []
-    user_schools = user.get_schools() if user else []
-    
-    return render_template("profile.html", 
-                         user=user,
-                         harvard_concentrations=harvard_concentrations,
-                         harvard_schools=harvard_schools,
-                         user_concentrations=user_concentrations,
-                         user_requirements=user_requirements,
-                         user_schools=user_schools)
+    user = session.get("profile") or {}
+    user_concentrations = user.get("concentrations") or []
+    user_requirements = user.get("requirements") or []
+    user_schools = user.get("schools") or []
+    return render_template(
+        "profile.html",
+        user=user,
+        harvard_concentrations=harvard_concentrations,
+        harvard_schools=harvard_schools,
+        user_concentrations=user_concentrations,
+        user_requirements=user_requirements,
+        user_schools=user_schools,
+    )
 
 
 @app.route("/profile/reset_all", methods=["POST"])
-@login_required
 def reset_all():
-    """Reset all user swipes and sorting game data"""
-    user_id = session["user_id"]
-    
-    # Delete all preferences
-    UserCoursePreference.query.filter_by(user_id=user_id).delete()
-    
-    # Delete all comparisons
-    SortComparison.query.filter_by(user_id=user_id).delete()
-    
-    db.session.commit()
+    session.pop("course_prefs", None)
+    session.pop("swipe_stack", None)
+    session.pop("comparisons", None)
+    session.modified = True
     flash("All choices cleared. Start swiping again!")
-    return redirect("/discover")
+    return redirect(url_for("discover"))
 
 
 def rank_courses_binary_search(courses, comparisons):
@@ -335,10 +306,14 @@ def get_gened_course_codes_for_categories(selected_categories, term_preferences)
     
     # Determine which GenEds JSON files to use based on term preferences
     geneds_files = []
+    if "2027 Spring" in term_preferences:
+        geneds_files.append("data/json/2027_Spring_Geneds.json")
     if "2026 Spring" in term_preferences:
-        geneds_files.append('data/json/2026_Spring_Geneds.json')
+        geneds_files.append("data/json/2026_Spring_Geneds.json")
+    if "2026 Fall" in term_preferences:
+        geneds_files.append("data/json/2026_Fall_Geneds.json")
     if "2025 Fall" in term_preferences:
-        geneds_files.append('data/json/2025_Fall_Geneds.json')
+        geneds_files.append("data/json/2025_Fall_Geneds.json")
     
     try:
         # Load GenEds JSON files and merge results
@@ -347,7 +322,6 @@ def get_gened_course_codes_for_categories(selected_categories, term_preferences)
             with open(geneds_file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
                 # Remove JSON comments (/* ... */) and handle placeholders for Spring GenEds file
-                import re
                 # Remove single-line and multi-line comments (/* ... */)
                 content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
                 # Remove the "categories" section with placeholders if it exists (not needed for our use case)
@@ -478,7 +452,7 @@ def is_fysemr_course(course):
     return course.course_number and course.course_number.startswith("FYSEMR")
 
 
-def recommend_course_weighted(user, seen_course_ids):
+def recommend_course_weighted(profile, seen_course_ids):
     """
     Recommend a course using weighted selection based on year and course level.
     Returns a single Course object or None.
@@ -489,14 +463,14 @@ def recommend_course_weighted(user, seen_course_ids):
         query = query.filter(~Course.id.in_(seen_course_ids))
     
     # Filter by term preference (required - enforced by profile page)
-    user_terms = user.get_terms()
+    user_terms = profile.get_terms()
     query = query.filter(Course.term_description.in_(user_terms))
     
     # Filter by affiliation
-    if user.affiliation == "Harvard College":
-        year = user.year
-        concentrations = user.get_concentrations()
-        requirements = user.get_requirements()
+    if profile.affiliation == "Harvard College":
+        year = profile.year
+        concentrations = profile.get_concentrations()
+        requirements = profile.get_requirements()
         
         # Check if First Year Seminar is selected (needs special handling)
         has_first_year_seminar = requirements and "First Year Seminar" in requirements
@@ -821,9 +795,9 @@ def recommend_course_weighted(user, seen_course_ids):
             return random.choice(weighted_pool)
         return None
     
-    elif user.affiliation == "Other":
+    elif profile.affiliation == "Other":
         # Use completely different algorithm for Other Affiliation users
-        schools = user.get_schools()
+        schools = profile.get_schools()
         if not schools:
             return None
         
@@ -863,418 +837,277 @@ def recommend_course_weighted(user, seen_course_ids):
 
 
 @app.route("/discover")
-@login_required
+@profile_complete
 def discover():
     """Tinder-style course discovery page with weighted recommendation algorithm"""
-    user = User.query.get(session["user_id"])
-    
-    # Handle case where user doesn't exist (e.g., after database recreation)
-    if not user:
-        session.clear()
-        flash("Your session has expired. Please log in again.", "error")
-        return redirect("/login")
-    
-    # Check if user has set preferences
-    if not user.affiliation:
+    raw_profile = session.get("profile") or {}
+    profile = ProfileProxy(raw_profile)
+    if not profile.affiliation:
         flash("Please set your preferences first!")
-        return redirect("/profile")
-    
-    # Check if term preference is set
-    user_terms = user.get_terms()
+        return redirect(url_for("profile"))
+    user_terms = profile.get_terms()
     if not user_terms:
         flash("Please select at least one term preference first!")
-        return redirect("/profile")
-    
-    # Check if profile is complete based on affiliation
-    if user.affiliation == "Harvard College":
-        if not user.year:
+        return redirect(url_for("profile"))
+    if profile.affiliation == "Harvard College":
+        if not profile.year:
             flash("Please complete your profile preferences first!")
-            return redirect("/profile")
-        # Allow 0 concentrations - user can select divisional distribution only
-    elif user.affiliation == "Other":
-        if not user.school_preferences:
+            return redirect(url_for("profile"))
+    elif profile.affiliation == "Other":
+        if not profile.get_schools():
             flash("Please complete your profile preferences first!")
-            return redirect("/profile")
-    
-    # Check if we should show a specific course (e.g., after undo)
+            return redirect(url_for("profile"))
+
     show_course_id = request.args.get("show_course", type=int)
     if show_course_id:
         course = Course.query.get(show_course_id)
         if course:
-            # Verify the course matches user's term preferences
             if user_terms and course.term_description not in user_terms:
-                course = None  # Course doesn't match term preference, treat as not found
+                course = None
             if course:
                 return render_template("discover.html", course=course, is_first_visit=False)
-    
-    # Get courses user has already seen
-    seen_course_ids = [p.course_id for p in UserCoursePreference.query.filter_by(user_id=user.id).all()]
-    
-    # Check if this is the user's first visit (no previous interactions)
+
+    seen_course_ids = _seen_course_ids()
     is_first_visit = len(seen_course_ids) == 0
-    
-    # Use weighted recommendation algorithm
-    course = recommend_course_weighted(user, seen_course_ids)
-    
-    # If no course found, check if user has saved courses and show appropriate message
+    course = recommend_course_weighted(profile, seen_course_ids)
+
     if not course:
-        # Check if user has any saved courses (hearts/stars)
-        saved_count = UserCoursePreference.query.filter(
-            and_(
-                UserCoursePreference.user_id == user.id,
-                UserCoursePreference.status.in_(['heart', 'star'])
-            )
-        ).count()
-        
+        prefs = _course_prefs()
+        saved_count = sum(1 for s in prefs.values() if s in ("heart", "star"))
         if saved_count > 0:
-            # User has saved courses - prompt to go to matches
-            return render_template("discover.html", 
-                                 course=None, 
-                                 message="No more relevant courses!",
-                                 prompt_type="matches",
-                                 saved_count=saved_count,
-                                 is_first_visit=False)
-        else:
-            # No saved courses - prompt to add more subjects
-            return render_template("discover.html", 
-                                 course=None, 
-                                 message="No more courses match your current preferences!",
-                                 prompt_type="profile",
-                                 is_first_visit=False)
-    
-   
-    
+            return render_template(
+                "discover.html",
+                course=None,
+                message="No more relevant courses!",
+                prompt_type="matches",
+                saved_count=saved_count,
+                is_first_visit=False,
+            )
+        return render_template(
+            "discover.html",
+            course=None,
+            message="No more courses match your current preferences!",
+            prompt_type="profile",
+            is_first_visit=False,
+        )
+
     return render_template("discover.html", course=course, is_first_visit=is_first_visit)
 
 
 @app.route("/swipe", methods=["POST"])
-@login_required
+@profile_complete
 def swipe():
     """Handle course swipe action (heart, star, discard)"""
-    user_id = session["user_id"]
     course_id = request.form.get("course_id", type=int)
-    action = request.form.get("action")  # 'heart', 'star', 'discard'
-    
+    action = request.form.get("action")
     if not course_id or not action:
         return apology("missing course_id or action", 400)
-    
-    if action not in ['heart', 'star', 'discard']:
+    if action not in ("heart", "star", "discard"):
         return apology("invalid action", 400)
-    
-    # Check if preference already exists
-    preference = UserCoursePreference.query.filter_by(
-        user_id=user_id, 
-        course_id=course_id
-    ).first()
-    
-    if preference:
-        # Update existing preference
-        preference.status = action
-    else:
-        # Create new preference
-        preference = UserCoursePreference(
-            user_id=user_id,
-            course_id=course_id,
-            status=action
-        )
-        db.session.add(preference)
-    
-    db.session.commit()
-    
-    # Redirect to next course
-    return redirect("/discover")
+    prefs = _course_prefs()
+    stack = _swipe_stack()
+    prefs[str(course_id)] = action
+    stack.append(course_id)
+    _trim_session_prefs()
+    session.modified = True
+    return redirect(url_for("discover"))
 
 
 @app.route("/discover/undo", methods=["POST"])
-@login_required
+@profile_complete
 def discover_undo():
     """Undo the last swipe action on discover page and return to that course"""
-    user_id = session["user_id"]
-    
-    # Get the most recent preference for this user
-    last_preference = UserCoursePreference.query.filter_by(
-        user_id=user_id
-    ).order_by(UserCoursePreference.timestamp.desc()).first()
-    
-    if last_preference:
-        # Store the course_id before deleting
-        course_id_to_show = last_preference.course_id
-        db.session.delete(last_preference)
-        db.session.commit()
+    stack = _swipe_stack()
+    prefs = _course_prefs()
+    if stack:
+        last_id = stack.pop()
+        prefs.pop(str(last_id), None)
+        session.modified = True
         flash("Last action undone!")
-        # Redirect to discover showing the course that was just undone
-        return redirect(f"/discover?show_course={course_id_to_show}")
-    
-    return redirect("/discover")
+        return redirect(url_for("discover", show_course=last_id))
+    return redirect(url_for("discover"))
 
 
 @app.route("/matches")
-@login_required
+@profile_complete
 def matches():
     """Matches page with sorting game and saved classes"""
-    user_id = session["user_id"]
-    user = User.query.get(user_id)
-    
-    # Handle case where user doesn't exist (e.g., after database recreation)
-    if not user:
-        session.clear()
-        flash("Your session has expired. Please log in again.", "error")
-        return redirect("/login")
-    
-    # Get user's liked/starred courses, filtered by term preference
-    saved_courses_query = UserCoursePreference.query.filter(
-        and_(
-            UserCoursePreference.user_id == user_id,
-            UserCoursePreference.status.in_(['heart', 'star'])
-        )
-    ).join(Course)
-    
-    # Filter by term preference if set
-    user_terms = user.get_terms()
-    if user_terms:
-        saved_courses_query = saved_courses_query.filter(Course.term_description.in_(user_terms))
-    
-    saved_courses = saved_courses_query.all()
-    
-    # Group courses by term
+    raw_profile = session.get("profile") or {}
+    profile = ProfileProxy(raw_profile)
+    user_terms = profile.get_terms()
+    prefs = _course_prefs()
+    saved_rows = []
+    for cid_str, status in prefs.items():
+        if status not in ("heart", "star"):
+            continue
+        c = Course.query.get(int(cid_str))
+        if c and (not user_terms or c.term_description in user_terms):
+            saved_rows.append(SavedPref(c, status))
+
     courses_by_term = {}
-    for pref in saved_courses:
+    for pref in saved_rows:
         term = pref.course.term_description or "Other"
-        if term not in courses_by_term:
-            courses_by_term[term] = []
-        courses_by_term[term].append(pref)
-    
-    # Get all comparisons and group by term
-    all_comparisons = SortComparison.query.filter_by(user_id=user_id).all()
-    
-    # Build a map of course_id -> term for quick lookup
+        courses_by_term.setdefault(term, []).append(pref)
+
+    all_comparisons = _comparisons_as_refs()
+
     course_term_map = {}
-    for pref in saved_courses:
+    for pref in saved_rows:
         course_term_map[pref.course.id] = pref.course.term_description or "Other"
-    
-    # Group comparisons by term (both courses must be in same term)
+
     comparisons_by_term = {}
     for comp in all_comparisons:
         term1 = course_term_map.get(comp.winner_course_id)
         term2 = course_term_map.get(comp.loser_course_id)
-        # Only include comparisons where both courses are in the same term
         if term1 and term2 and term1 == term2:
-            if term1 not in comparisons_by_term:
-                comparisons_by_term[term1] = []
-            comparisons_by_term[term1].append(comp)
-    
-    # Calculate rankings separately for each term
+            comparisons_by_term.setdefault(term1, []).append(comp)
+
     rankings_by_term = {}
     show_ranked_list_by_term = {}
     comparison_count_by_term = {}
     min_comparisons_by_term = {}
-    
-    for term, prefs in courses_by_term.items():
-        # Get courses for this term
-        term_courses = [pref.course for pref in prefs]
-        
-        # Get comparisons for this term only
+
+    for term, prefs_list in courses_by_term.items():
+        term_courses = [pref.course for pref in prefs_list]
         term_comparisons = comparisons_by_term.get(term, [])
         comparison_count_by_term[term] = len(term_comparisons)
-        
-        # Minimum comparisons needed for this term
         total_courses_in_term = len(term_courses)
-        min_comparisons_by_term[term] = max(3, min(10, total_courses_in_term - 1)) if total_courses_in_term > 1 else 0
+        min_comparisons_by_term[term] = (
+            max(3, min(10, total_courses_in_term - 1)) if total_courses_in_term > 1 else 0
+        )
         show_ranked_list_by_term[term] = comparison_count_by_term[term] >= min_comparisons_by_term[term]
-        
-        # Calculate rankings for this term only
         if term_comparisons:
             rankings_by_term[term] = rank_courses_binary_search(term_courses, term_comparisons)
         else:
             rankings_by_term[term] = {}
-    
-    # Select comparison pair - only from the same term
+
     comparison_pair = None
     comparison_term = None
-    
-    # Get all available terms with at least 2 courses
-    available_terms = [term for term, prefs in courses_by_term.items() if len(prefs) >= 2]
-    
+    available_terms = [term for term, plist in courses_by_term.items() if len(plist) >= 2]
+
     if available_terms:
-        # Build compared pairs set (by term)
         compared_pairs_by_term = {}
         for term in available_terms:
             compared_pairs_by_term[term] = set()
-            term_comparisons = comparisons_by_term.get(term, [])
-            for comp in term_comparisons:
+            for comp in comparisons_by_term.get(term, []):
                 compared_pairs_by_term[term].add((comp.winner_course_id, comp.loser_course_id))
                 compared_pairs_by_term[term].add((comp.loser_course_id, comp.winner_course_id))
-        
-        # Try to find an available pair within a single term
         available_pairs_by_term = {}
         for term in available_terms:
             term_prefs = courses_by_term[term]
             term_compared = compared_pairs_by_term.get(term, set())
             available_pairs = []
             for i, pref1 in enumerate(term_prefs):
-                for pref2 in term_prefs[i+1:]:
+                for pref2 in term_prefs[i + 1 :]:
                     if (pref1.course.id, pref2.course.id) not in term_compared:
                         available_pairs.append((pref1.course, pref2.course))
             if available_pairs:
                 available_pairs_by_term[term] = available_pairs
-        
-        # Pick a random term with available pairs, or any term if all pairs are compared
         if available_pairs_by_term:
             comparison_term = random.choice(list(available_pairs_by_term.keys()))
             comparison_pair = random.choice(available_pairs_by_term[comparison_term])
         else:
-            # All pairs compared in all terms, pick any random pair from same term
             comparison_term = random.choice(available_terms)
             term_prefs = courses_by_term[comparison_term]
             comparison_pair = tuple(random.sample([pref.course for pref in term_prefs], 2))
-    
-    # Sort each term group based on whether rankings are shown for that term
-    for term, prefs in courses_by_term.items():
+
+    for term, plist in courses_by_term.items():
         show_ranked = show_ranked_list_by_term.get(term, False)
         term_rankings = rankings_by_term.get(term, {})
-        
         if show_ranked and term_rankings:
-            # Use rankings: sort by rank ascending (rank 0 = best = position 1 at top)
-            # Rank 0 should appear first, then 1, then 2, etc.
-            prefs.sort(key=lambda p: (
-                term_rankings.get(p.course.id, 999)  # Lower rank number = better course = appears higher in list
-            ))
-            # Create ranking positions (1-based)
-            for pref in prefs:
+            plist.sort(key=lambda p: (term_rankings.get(p.course.id, 999)))
+            for pref in plist:
                 rank_pos = term_rankings.get(pref.course.id, None)
-                if rank_pos is not None:
-                    pref.ranking_position = rank_pos + 1  # Convert 0-based to 1-based
-                else:
-                    pref.ranking_position = None
+                pref.ranking_position = rank_pos + 1 if rank_pos is not None else None
         else:
-            # Before ranking: starred courses first, then hearted courses
-            prefs.sort(key=lambda p: (0 if p.status == 'star' else 1, p.course.course_number))
-            # No ranking positions yet
-            for pref in prefs:
+            plist.sort(key=lambda p: (0 if p.status == "star" else 1, p.course.course_number))
+            for pref in plist:
                 pref.ranking_position = None
-    
-    # Calculate totals across all terms for progress display
+
     total_comparison_count = sum(comparison_count_by_term.values())
-    total_courses = sum(len(prefs) for prefs in courses_by_term.values())
-    
-    # Determine if any term has enough comparisons (for general progress message)
-    any_ranked = any(show_ranked_list_by_term.values())
-    
-    return render_template("matches.html",
-                         comparison_pair=comparison_pair,
-                         comparison_term=comparison_term,
-                         courses_by_term=courses_by_term,
-                         show_ranked_list_by_term=show_ranked_list_by_term,
-                         comparison_count_by_term=comparison_count_by_term,
-                         min_comparisons_by_term=min_comparisons_by_term,
-                         total_comparison_count=total_comparison_count,
-                         total_courses=total_courses,
-                         available_terms=available_terms if 'available_terms' in locals() else [])
+    total_courses = sum(len(plist) for plist in courses_by_term.values())
+
+    return render_template(
+        "matches.html",
+        comparison_pair=comparison_pair,
+        comparison_term=comparison_term,
+        courses_by_term=courses_by_term,
+        show_ranked_list_by_term=show_ranked_list_by_term,
+        comparison_count_by_term=comparison_count_by_term,
+        min_comparisons_by_term=min_comparisons_by_term,
+        total_comparison_count=total_comparison_count,
+        total_courses=total_courses,
+        available_terms=available_terms if available_terms else [],
+    )
 
 
 @app.route("/matches/compare", methods=["POST"])
-@login_required
+@profile_complete
 def compare():
     """Handle sorting game comparison"""
-    user_id = session["user_id"]
     winner_id = request.form.get("winner_course_id", type=int)
     loser_id = request.form.get("loser_course_id", type=int)
-    
     if not winner_id or not loser_id:
         return apology("missing course IDs", 400)
-    
     if winner_id == loser_id:
         return apology("courses must be different", 400)
-    
-    # Verify both courses exist and are from the same term
     winner_course = Course.query.get(winner_id)
     loser_course = Course.query.get(loser_id)
-    
     if not winner_course or not loser_course:
         return apology("invalid course IDs", 400)
-    
-    # Ensure courses are from the same term
     if winner_course.term_description != loser_course.term_description:
         flash("You can only compare courses from the same semester.", "error")
-        return redirect("/matches")
-    
-    # Check if comparison already exists
-    existing = SortComparison.query.filter_by(
-        user_id=user_id,
-        winner_course_id=winner_id,
-        loser_course_id=loser_id
-    ).first()
-    
-    if not existing:
-        comparison = SortComparison(
-            user_id=user_id,
-            winner_course_id=winner_id,
-            loser_course_id=loser_id
-        )
-        db.session.add(comparison)
-        db.session.commit()
-    
-    return redirect("/matches")
+        return redirect(url_for("matches"))
+    existing_pairs = {(a[0], a[1]) for a in _comparisons_list()}
+    if (winner_id, loser_id) not in existing_pairs:
+        _comparisons_list().append([winner_id, loser_id])
+        session.modified = True
+    return redirect(url_for("matches"))
 
 
 @app.route("/matches/undo", methods=["POST"])
-@login_required
+@profile_complete
 def undo_comparison():
     """Undo the last comparison"""
-    user_id = session["user_id"]
-    
-    # Get the most recent comparison
-    last_comparison = SortComparison.query.filter_by(
-        user_id=user_id
-    ).order_by(SortComparison.timestamp.desc()).first()
-    
-    if last_comparison:
-        db.session.delete(last_comparison)
-        db.session.commit()
+    cl = _comparisons_list()
+    if cl:
+        cl.pop()
+        session.modified = True
         flash("Last comparison undone", "success")
     else:
         flash("No comparison to undo", "error")
-    
-    return redirect("/matches")
+    return redirect(url_for("matches"))
 
 
 @app.route("/matches/skip", methods=["POST"])
-@login_required
+@profile_complete
 def skip_comparison():
-    """Skip the current comparison pair"""
-    # Just redirect to matches to get a new pair
     flash("Comparison skipped", "info")
-    return redirect("/matches")
+    return redirect(url_for("matches"))
 
 
 @app.route("/matches/update_preference", methods=["POST"])
-@login_required
+@profile_complete
 def update_preference():
     """Update preference status for a saved course"""
-    user_id = session["user_id"]
     course_id = request.form.get("course_id", type=int)
-    action = request.form.get("action")  # 'heart', 'star', 'remove'
-    
+    action = request.form.get("action")
     if not course_id or not action:
         return apology("missing course_id or action", 400)
-    
-    preference = UserCoursePreference.query.filter_by(
-        user_id=user_id,
-        course_id=course_id
-    ).first()
-    
-    if not preference:
+    prefs = _course_prefs()
+    key = str(course_id)
+    if key not in prefs:
         return apology("course not found", 404)
-    
     if action == "remove":
-        db.session.delete(preference)
-    elif action in ['heart', 'star']:
-        preference.status = action
+        prefs.pop(key, None)
+        _swipe_stack()[:] = [i for i in _swipe_stack() if i != course_id]
+    elif action in ("heart", "star"):
+        prefs[key] = action
     else:
         return apology("invalid action", 400)
-    
-    db.session.commit()
-    return redirect("/matches")
+    session.modified = True
+    return redirect(url_for("matches"))
+
 
 
 @app.cli.command("import-courses")
@@ -1308,34 +1141,14 @@ def import_courses(json_file):
             term_description=term_description
         ).first()
         
-        # Extract instructor name
-        instructors = course_data.get('publishedInstructors', [])
-        instructor_name = ', '.join([inst.get('instructorName', '') for inst in instructors]) if instructors else None
-        
-        # Extract meeting info
-        meetings = course_data.get('meetings', [])
-        start_time = None
-        end_time = None
-        days_of_week = None
-        
-        if isinstance(meetings, list) and len(meetings) > 0:
-            meeting = meetings[0]
-            if isinstance(meeting, dict):
-                start_time = meeting.get('startTime')
-                end_time = meeting.get('endTime')
-                days_list = meeting.get('daysOfWeek', [])
-                if days_list:
-                    # Convert day names to abbreviations
-                    day_map = {
-                        'Monday': 'M',
-                        'Tuesday': 'T',
-                        'Wednesday': 'W',
-                        'Thursday': 'Th',
-                        'Friday': 'F',
-                        'Saturday': 'S',
-                        'Sunday': 'Su'
-                    }
-                    days_of_week = ','.join([day_map.get(day, day) for day in days_list])
+        instructors = course_data.get("publishedInstructors", [])
+        instructor_name = filter_published_instructor_names(instructors)
+
+        mf = extract_meeting_fields(course_data.get("meetings"))
+        days_of_week = mf["days_of_week"]
+        start_time = mf["start_time"]
+        end_time = mf["end_time"]
+        meetings_display = mf["meetings_display"]
         
         # Extract requirement flags
         divisional_dist = course_data.get('divisionalDistribution')
@@ -1375,6 +1188,7 @@ def import_courses(json_file):
             'start_time': start_time,
             'end_time': end_time,
             'days_of_week': days_of_week,
+            'meetings_display': meetings_display,
             'course_url': course_data.get('courseURL', ''),
             'description': course_data.get('courseDescription', ''),
             'quotes_json': None,  # QReports data not in JSON, can be added separately

@@ -34,60 +34,41 @@ pip install -r requirements.txt
 This will install:
 - Flask 2.3.3 (web framework)
 - Flask-SQLAlchemy 3.1.1 (database ORM)
-- Flask-Session 0.5.0 (session management)
 - Werkzeug 2.3.8 (security utilities)
 - SQLAlchemy 2.0.23 (database toolkit)
 - Click 8.1.7 (CLI framework)
 
-### 2. Initialize the Database
+### 2. Build the course catalog (SQLite)
 
-The database will be created automatically when you first run the application. To explicitly create it:
+Preferences and swipes are stored in your browser session (no accounts). The course catalog lives in `catalog.db` at the project root.
 
 ```bash
-python app.py
+python scripts/build_catalog.py
 ```
 
-This creates the SQLite database file at `instance/classcupid.db` with all necessary tables (users, courses, user_course_preferences, sort_comparisons).
+This imports `data/json/2026_Fall_courses.json` and `data/json/2027_Spring_courses.json`. To use other exports, run `flask --app app import-courses path/to/file.json` after the database exists.
 
-**Note**: If you need to recreate the database from scratch, delete the `instance/classcupid.db` file and run the above command again.
+**Note**: Delete `catalog.db` before rebuilding if you want a clean import.
 
-### 3. Import Course Data
+### 3. Run the Application
 
-Import course catalog data from JSON files. You can import multiple semesters:
+Set a secret key for sessions (required in production), then start the server:
 
 ```bash
-# Import Fall 2025 courses
-flask import-courses data/json/2025_Fall_courses.json
-
-# Import Spring 2026 courses
-flask import-courses data/json/2026_Spring_courses.json
+export SECRET_KEY="your-random-secret"
+flask --app app run
 ```
 
-The import command will:
-- Parse the JSON file and extract course information
-- Check for existing courses (by course ID and term) and update them if found
-- Import new courses if they don't exist
-- Display a summary: `Import complete: X imported, Y updated, Z skipped`
-
-**Important**: The same course can exist in multiple semesters (e.g., a course offered in both Fall and Spring). Each semester's version is stored separately using a composite unique constraint on `(course_id, term_description)`.
-
-### 4. Run the Application
-
-Start the Flask development server:
+Or:
 
 ```bash
-flask run
-```
-
-Or alternatively:
-
-```bash
+export SECRET_KEY="your-random-secret"
 python app.py
 ```
 
 The application will start on `http://localhost:5000` (default Flask port). If port 5000 is already in use, Flask will automatically use the next available port and display it in the terminal.
 
-### 5. Access the Application
+### 4. Access the Application
 
 Open your web browser and navigate to:
 
@@ -99,12 +80,10 @@ http://localhost:5000
 
 ### First-Time Setup
 
-1. **Register an Account**: Click "Register" on the login page and create a username and password.
-
-2. **Configure Your Settings** (required before using Discover):
-   - Click on your username in the navigation bar (or "Profile" if not yet logged in)
+1. **Configure your preferences** (required before using Discover):
+   - Open **Preferences** from the navigation bar (or you will be redirected there from the home page)
    - Select your affiliation: "Harvard College" or "Other Affiliation"
-   - **Select term(s)**: Choose "2025 Fall", "2026 Spring", or both (you can select multiple)
+   - **Select term(s)**: Choose "2026 Fall", "2027 Spring", or both (you can select multiple)
    - If "Harvard College":
      - Choose your year: Freshman, Sophomore, Junior, or Senior
      - Select concentration interests (you can select multiple, or use "Select all")
@@ -127,7 +106,7 @@ http://localhost:5000
        - Harvard Kennedy School
        - Harvard Law School
        - Harvard Medical School
-   - Click "Update Profile" to save your preferences
+   - Click **Save Preferences** to save your settings
 
 ### Discovering Courses
 
@@ -253,52 +232,53 @@ Once you swipe a course (heart, star, or discard), it is **permanently removed**
 
 ## Database
 
-The application uses SQLite with SQLAlchemy ORM. The database file is located at:
+The application uses SQLite with SQLAlchemy ORM for the **read-only course catalog** only:
 
 ```
-instance/classcupid.db
+catalog.db   # project root; built by scripts/build_catalog.py
 ```
 
 ### Database Schema
 
-- **users**: User accounts and preferences (stored as JSON arrays)
-- **courses**: Course catalog data (can have multiple entries per course for different semesters)
-- **user_course_preferences**: Tracks heart/star/discard actions with timestamps
-- **sort_comparisons**: Stores pairwise comparisons from the matching game with timestamps
+- **courses**: Course catalog (multiple rows per catalog course ID when offered in different terms)
+
+Swipes, comparisons, and profile fields are stored in the **signed Flask session cookie** (not in SQLite). Clearing site data or using another browser resets them.
 
 ### Backup and Recovery
 
-The database is automatically backed up to the `backups/` directory when you run certain commands. To manually backup:
+Back up or restore the catalog file as needed:
 
 ```bash
-cp instance/classcupid.db backups/classcupid_backup_$(date +%Y%m%d_%H%M%S).db
+cp catalog.db backups/catalog_backup_$(date +%Y%m%d_%H%M%S).db
+cp backups/catalog_backup_YYYYMMDD_HHMMSS.db catalog.db
 ```
 
-To restore from a backup, stop the application and replace the database file:
+## Deploying on Vercel
 
-```bash
-cp backups/classcupid_backup_YYYYMMDD_HHMMSS.db instance/classcupid.db
-```
+1. Set the environment variable **`SECRET_KEY`** to a long random string in the Vercel project settings.
+2. Connect the repo and deploy. The **`buildCommand`** in `vercel.json` installs dependencies and runs `scripts/build_catalog.py`, which creates `catalog.db` from the JSON under `data/json/`.
+3. Vercel detects the Flask app in root `app.py` automatically (see [Flask on Vercel](https://vercel.com/docs/frameworks/backend/flask)).
+
+If the build times out, build `catalog.db` locally, commit it, and adjust `.gitignore` to allow that file (or attach it via another storage strategy).
 
 ## Troubleshooting
 
 ### No courses appearing on Discover page
 
-1. **Check your Settings**: Make sure you've selected at least one term preference. Click your username → Settings and verify your selections.
+1. **Check Preferences**: Make sure you've selected at least one term. Open **Preferences** in the nav and verify your selections.
 
-2. **Check course data**: Verify that courses have been imported:
+2. **Check course data**: Verify that the catalog was built:
    ```bash
-   # Check the database (requires sqlite3 command-line tool)
-   sqlite3 instance/classcupid.db "SELECT COUNT(*) FROM courses;"
+   sqlite3 catalog.db "SELECT COUNT(*) FROM courses;"
    ```
 
 3. **Check your preferences**: Very specific filtering (e.g., single concentration + multiple requirements) may result in few or no matches. Try expanding your selections.
 
 4. **All courses already swiped**: If you've swiped through all available courses, you'll see a message prompting you to either check Matches or update your Settings.
 
-### "Your session has expired" error
+### Lost swipes or preferences
 
-This occurs if the database was recreated and your user account no longer exists. Simply log out and register a new account, or log back in if your account still exists.
+Session data lives in cookies. If `SECRET_KEY` changes between deploys, or you clear cookies, your preferences and swipe history reset. Set a stable `SECRET_KEY` in production.
 
 ### Import errors
 
@@ -311,33 +291,29 @@ This occurs if the database was recreated and your user account no longer exists
 If port 5000 is busy, Flask will automatically use another port. Check the terminal output for the actual port number, or specify a different port:
 
 ```bash
-flask run --port 5001
+flask --app app run --port 5001
 ```
 
 ### Database migration issues
 
-If you've updated the code and need to add new columns to existing tables, you may need to recreate the database:
-
-1. Back up your data (if needed): `cp instance/classcupid.db backups/backup.db`
-2. Delete `instance/classcupid.db`
-3. Run `python app.py` to recreate tables
-4. Re-import course data using `flask import-courses data/json/2025_Fall_courses.json` (and Spring if needed)
+If you pull a schema change (new columns on `courses`), delete `catalog.db` and run `python scripts/build_catalog.py` again (or import with `flask --app app import-courses ...`).
 
 ## Project Structure
 
 ```
 class_cupidv1/
 ├── app.py                          # Main Flask application (routes, algorithms, CLI commands)
-├── models.py                       # Database models (User, Course, UserCoursePreference, SortComparison)
-├── helpers.py                      # Utility functions (login_required decorator, apology helper)
+├── models.py                       # Database models (Course catalog only)
+├── helpers.py                      # profile_complete decorator, apology helper
+├── vercel.json                     # Vercel build command (catalog build)
+├── scripts/build_catalog.py        # Build catalog.db from data/json course exports
+├── catalog.db                      # SQLite catalog (created by build script; gitignored)
 ├── requirements.txt                # Python dependencies
 ├── README.md                       # This file (user manual)
 ├── DESIGN.md                       # Technical design document
 ├── templates/                      # HTML templates
 │   ├── base.html                  # Base template with navigation, footer, flash messages
-│   ├── login.html                 # Authentication page
-│   ├── register.html              # User registration
-│   ├── profile.html               # Settings/preferences page
+│   ├── profile.html               # Preferences (no accounts)
 │   ├── discover.html              # Course discovery (swipe interface)
 │   └── matches.html               # Comparison game and saved courses list
 ├── static/
@@ -353,16 +329,15 @@ class_cupidv1/
 ├── data/                          # Organized data files
 │   ├── images/                    # Logo files and icons (duplicates from root)
 │   └── json/                      # Course catalogs and reference data
-│       ├── 2025_Fall_courses.json
-│       ├── 2026_Spring_courses.json
+│       ├── 2026_Fall_courses.json
+│       ├── 2027_Spring_courses.json
 │       ├── 2025_Fall_Geneds.json
+│       ├── 2026_Fall_Geneds.json
 │       ├── 2026_Spring_Geneds.json
+│       ├── 2027_Spring_Geneds.json
 │       ├── harvard_college_concentrations.json
 │       └── harvard_schools.json
-├── instance/
-│   └── classcupid.db              # SQLite database (created at runtime)
-├── flask_session/                 # Session files (created at runtime)
-└── backups/                       # Database backups (created as needed)
+└── backups/                       # Optional local backups of catalog.db
 ```
 
 ## Additional Notes
@@ -377,7 +352,7 @@ class_cupidv1/
 
 - **Logo and Branding**: The Class Cupid logo appears in the header (with text) and as a favicon. A footer logo appears at the bottom of pages with copyright information.
 
-- **Error Handling**: Error messages are displayed directly on login/register pages using flash messages (not separate error pages) for better user experience.
+- **Error Handling**: Flash messages for user-visible errors; API-style errors return plain text from `apology()`.
 
 For detailed technical implementation information, algorithms, and architecture decisions, see `DESIGN.md`.
 

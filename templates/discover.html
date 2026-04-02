@@ -42,7 +42,7 @@
                    Head over to your <a href="{{ url_for('matches') }}">matches</a> to start sorting them!</p>
             {% elif prompt_type == "profile" %}
                 <p>To see more courses, update your profile to include more subjects or requirements.</p>
-                <p><a href="{{ url_for('profile') }}" class="btn btn-primary">Update Profile</a></p>
+                <p><a href="{{ url_for('profile') }}" class="btn btn-primary">Update preferences</a></p>
                 <p>Or check your <a href="{{ url_for('matches') }}">matches</a> if you have any saved courses.</p>
             {% else %}
                 <p>You've seen all available courses! Check your <a href="{{ url_for('matches') }}">matches</a> or reset your preferences.</p>
@@ -57,7 +57,9 @@
             <div class="course-title-section">
                 <h2 class="course-title">{{ course.course_title }}</h2>
                 <p class="course-instructor">{{ course.instructor_name or "TBA" }}</p>
-                <a href="{{ course.course_url }}" target="_blank" class="course-link">View official course page →</a>
+                {% if course.course_url %}
+                <a href="{{ course.course_url }}" target="_blank" rel="noopener noreferrer" class="course-link">View official course page →</a>
+                {% endif %}
             </div>
             
             <div class="course-content">
@@ -80,6 +82,8 @@
                         <strong>Time:</strong> 
                         {% if course.start_time and course.end_time %}
                             {{ course.start_time }} – {{ course.end_time }}
+                        {% elif course.meetings_display %}
+                            {{ course.meetings_display }}
                         {% else %}
                             TBA
                         {% endif %}
