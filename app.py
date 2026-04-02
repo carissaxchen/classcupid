@@ -308,10 +308,10 @@ def get_gened_course_codes_for_categories(selected_categories, term_preferences)
     geneds_files = []
     if "2027 Spring" in term_preferences:
         geneds_files.append("data/json/2027_Spring_Geneds.json")
-    if "2026 Spring" in term_preferences:
-        geneds_files.append("data/json/2026_Spring_Geneds.json")
     if "2026 Fall" in term_preferences:
         geneds_files.append("data/json/2026_Fall_Geneds.json")
+    if "2026 Spring" in term_preferences:
+        geneds_files.append("data/json/2026_Spring_Geneds.json")
     if "2025 Fall" in term_preferences:
         geneds_files.append("data/json/2025_Fall_Geneds.json")
     
