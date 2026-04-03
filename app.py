@@ -5,7 +5,7 @@ import re
 import shutil
 from pathlib import Path
 
-from flask import Flask, flash, redirect, render_template, request, session, url_for
+from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy import and_, or_
 import click
 
@@ -452,10 +452,10 @@ def is_fysemr_course(course):
     return course.course_number and course.course_number.startswith("FYSEMR")
 
 
-def recommend_course_weighted(profile, seen_course_ids):
+def _get_filtered_discover_courses(profile, seen_course_ids):
     """
-    Recommend a course using weighted selection based on year and course level.
-    Returns a single Course object or None.
+    All courses still available to show the user (same filters as recommendation), before weighting.
+    Used for progress and for weighted random pick.
     """
     # Get all eligible courses (filtered but not yet weighted)
     query = Course.query
@@ -507,7 +507,7 @@ def recommend_course_weighted(profile, seen_course_ids):
             if not concentrations and not requirements:
                 if not fysemr_courses:
                     return None
-                return random.choice(fysemr_courses)
+                return fysemr_courses
         else:
             fysemr_courses = []
         
@@ -705,96 +705,8 @@ def recommend_course_weighted(profile, seen_course_ids):
         
         if not filtered_courses:
             return None
-        
-        # Weight courses based on year and level
-        weighted_pool = []
-        year_lower = year.lower() if year else None
-        
-        for course in filtered_courses:
-            level = course.classify_level()
-            weight = 0
-            
-            if year_lower == "freshman":
-                # Handle FYSEMR courses: only freshmen get weight
-                # Lower weight (1) to prevent FYSEMR courses from dominating when many are available
-                if is_fysemr_course(course):
-                    weight = 1  # Lower weight for better variety with other course types
-                elif level == "UG_intro":
-                    weight = 8  # Heavy on UG_intro (1-99, 1000-1099)
-                elif level == "UG_mid":
-                    weight = 2  # Moderate weight on UG_mid (100-199, 1100-1999)
-                elif level == "Alpha":
-                    weight = 2  # Alpha courses available to all
-                # NO Grad_low or Grad_research for freshmen
-                # NO tutorials, special seminars, or reading research for freshmen
-            
-            elif year_lower == "sophomore":
-                # Non-freshmen get weight 0 for FYSEMR courses (not added to pool)
-                if is_fysemr_course(course):
-                    weight = 0  # Skip FYSEMR courses for non-freshmen
-                elif level == "UG_intro":
-                    weight = 5  # Less highly than freshmen, but not too low
-                elif level == "UG_mid":
-                    weight = 5  # More highly than UG_intro
-                elif level == "SophomoreTutorial":  # 97, 970
-                    weight = 2
-                elif level == "SpecialSeminar":  # 96, 960
-                    weight = 2
-                elif level == "ReadingResearch":  # 91, 910
-                    weight = 2
-                elif level == "Alpha":
-                    weight = 2  # Same across all years
-                # NO Grad_low or Grad_research for sophomores
-            
-            elif year_lower == "junior":
-                # Non-freshmen get weight 0 for FYSEMR courses (not added to pool)
-                if is_fysemr_course(course):
-                    weight = 0  # Skip FYSEMR courses for non-freshmen
-                elif level == "UG_intro":
-                    weight = 2  # Very low
-                elif level == "UG_mid":
-                    weight = 8  # Highly (more than sophomores)
-                elif level == "Grad_low":  # 200-299, 2000-2999
-                    weight = 3  # Moderately (higher than UG_intro but lower than UG_mid)
-                elif level == "JuniorTutorial":  # 98, 980
-                    weight = 2
-                elif level == "SpecialSeminar":  # 96, 960
-                    weight = 2
-                elif level == "ReadingResearch":  # 91, 910
-                    weight = 2
-                elif level == "Alpha":
-                    weight = 2  # Same across all years
-                # NO Grad_research for juniors
-            
-            elif year_lower == "senior":
-                # Non-freshmen get weight 0 for FYSEMR courses (not added to pool)
-                if is_fysemr_course(course):
-                    weight = 0  # Skip FYSEMR courses for non-freshmen
-                elif level == "UG_intro":
-                    weight = 1  # Very low (lowest of all years, practically never display)
-                elif level == "UG_mid":
-                    weight = 7  # Highly (more than juniors)
-                elif level == "Grad_low":  # 200-299, 2000-2999
-                    weight = 6  # Highly (more than juniors)
-                elif level == "SeniorTutorial":  # 99, 990
-                    weight = 2
-                elif level == "SpecialSeminar":  # 96, 960
-                    weight = 2
-                elif level == "ReadingResearch":  # 91, 910
-                    weight = 2
-                elif level == "Alpha":
-                    weight = 2  # Same across all years
-                # NO Grad_research for seniors
-            
-            # Add course to pool with its weight
-            if weight > 0:
-                weighted_pool.extend([course] * weight)
-        
-        # Select random course from weighted pool
-        if weighted_pool:
-            return random.choice(weighted_pool)
-        return None
-    
+        return filtered_courses
+
     elif profile.affiliation == "Other":
         # Use completely different algorithm for Other Affiliation users
         schools = profile.get_schools()
@@ -827,13 +739,121 @@ def recommend_course_weighted(profile, seen_course_ids):
                     filtered_courses.append(course)
             eligible_courses = filtered_courses
         
-        # Return a random course from the filtered eligible courses
-        # This course will be displayed on the discover page
         if eligible_courses:
-            return random.choice(eligible_courses)
+            return eligible_courses
         return None
-    
+
     return None
+
+
+def recommend_course_weighted(profile, seen_course_ids):
+    """Recommend a course using weighted selection based on year and course level."""
+    pool = _get_filtered_discover_courses(profile, seen_course_ids)
+    if not pool:
+        return None
+    if profile.affiliation == "Other":
+        return random.choice(pool)
+
+    year = profile.year
+    year_lower = year.lower() if year else None
+    weighted_pool = []
+    for course in pool:
+        level = course.classify_level()
+        weight = 0
+
+        if year_lower == "freshman":
+            if is_fysemr_course(course):
+                weight = 1
+            elif level == "UG_intro":
+                weight = 8
+            elif level == "UG_mid":
+                weight = 2
+            elif level == "Alpha":
+                weight = 2
+
+        elif year_lower == "sophomore":
+            if is_fysemr_course(course):
+                weight = 0
+            elif level == "UG_intro":
+                weight = 5
+            elif level == "UG_mid":
+                weight = 5
+            elif level == "SophomoreTutorial":
+                weight = 2
+            elif level == "SpecialSeminar":
+                weight = 2
+            elif level == "ReadingResearch":
+                weight = 2
+            elif level == "Alpha":
+                weight = 2
+
+        elif year_lower == "junior":
+            if is_fysemr_course(course):
+                weight = 0
+            elif level == "UG_intro":
+                weight = 2
+            elif level == "UG_mid":
+                weight = 8
+            elif level == "Grad_low":
+                weight = 3
+            elif level == "JuniorTutorial":
+                weight = 2
+            elif level == "SpecialSeminar":
+                weight = 2
+            elif level == "ReadingResearch":
+                weight = 2
+            elif level == "Alpha":
+                weight = 2
+
+        elif year_lower == "senior":
+            if is_fysemr_course(course):
+                weight = 0
+            elif level == "UG_intro":
+                weight = 1
+            elif level == "UG_mid":
+                weight = 7
+            elif level == "Grad_low":
+                weight = 6
+            elif level == "SeniorTutorial":
+                weight = 2
+            elif level == "SpecialSeminar":
+                weight = 2
+            elif level == "ReadingResearch":
+                weight = 2
+            elif level == "Alpha":
+                weight = 2
+
+        if weight > 0:
+            weighted_pool.extend([course] * weight)
+
+    if weighted_pool:
+        return random.choice(weighted_pool)
+    return None
+
+
+def discover_pool_stats(profile):
+    """Returns (explored_count, total_in_pool, percent_explored) or (None, None, None)."""
+    seen_set = set(_seen_course_ids())
+    full = _get_filtered_discover_courses(profile, [])
+    if not full:
+        return None, None, None
+    total = len(full)
+    remaining = sum(1 for c in full if c.id not in seen_set)
+    explored = max(0, total - remaining)
+    pct = min(100, int(round(100 * explored / total))) if total else 0
+    return explored, total, pct
+
+
+def _discover_context(profile):
+    """Shared template variables for discover page."""
+    saved_matches_count = sum(1 for s in _course_prefs().values() if s in ("heart", "star"))
+    ex, tot, pct = discover_pool_stats(profile)
+    return {
+        "saved_matches_count": saved_matches_count,
+        "discover_explored": ex,
+        "discover_total": tot,
+        "discover_pct": pct,
+    }
 
 
 @app.route("/discover")
@@ -865,7 +885,9 @@ def discover():
             if user_terms and course.term_description not in user_terms:
                 course = None
             if course:
-                return render_template("discover.html", course=course, is_first_visit=False)
+                ctx = _discover_context(profile)
+                ctx.update(course=course, is_first_visit=False)
+                return render_template("discover.html", **ctx)
 
     seen_course_ids = _seen_course_ids()
     is_first_visit = len(seen_course_ids) == 0
@@ -874,24 +896,26 @@ def discover():
     if not course:
         prefs = _course_prefs()
         saved_count = sum(1 for s in prefs.values() if s in ("heart", "star"))
+        ctx = _discover_context(profile)
+        ctx.update(is_first_visit=False)
         if saved_count > 0:
-            return render_template(
-                "discover.html",
+            ctx.update(
                 course=None,
                 message="No more relevant courses!",
                 prompt_type="matches",
                 saved_count=saved_count,
-                is_first_visit=False,
             )
-        return render_template(
-            "discover.html",
+            return render_template("discover.html", **ctx)
+        ctx.update(
             course=None,
             message="No more courses match your current preferences!",
             prompt_type="profile",
-            is_first_visit=False,
         )
+        return render_template("discover.html", **ctx)
 
-    return render_template("discover.html", course=course, is_first_visit=is_first_visit)
+    ctx = _discover_context(profile)
+    ctx.update(course=course, is_first_visit=is_first_visit)
+    return render_template("discover.html", **ctx)
 
 
 @app.route("/swipe", methods=["POST"])
@@ -1024,8 +1048,28 @@ def matches():
             for pref in plist:
                 pref.ranking_position = None
 
+        manual = session.get("manual_rank_order", {}).get(term)
+        if manual and show_ranked:
+            id_to_pref = {p.course.id: p for p in plist}
+            ordered = []
+            for cid in manual:
+                if cid in id_to_pref:
+                    ordered.append(id_to_pref[cid])
+            placed = {p.course.id for p in ordered}
+            for p in plist:
+                if p.course.id not in placed:
+                    ordered.append(p)
+            plist[:] = ordered
+            for i, pref in enumerate(plist):
+                pref.ranking_position = i + 1
+
     total_comparison_count = sum(comparison_count_by_term.values())
     total_courses = sum(len(plist) for plist in courses_by_term.values())
+
+    show_scroll_rankings_popup = bool(
+        any(show_ranked_list_by_term.values())
+        and not session.get("scroll_rankings_hint_dismissed")
+    )
 
     return render_template(
         "matches.html",
@@ -1038,6 +1082,7 @@ def matches():
         total_comparison_count=total_comparison_count,
         total_courses=total_courses,
         available_terms=available_terms if available_terms else [],
+        show_scroll_rankings_popup=show_scroll_rankings_popup,
     )
 
 
@@ -1084,6 +1129,32 @@ def undo_comparison():
 def skip_comparison():
     flash("Comparison skipped", "info")
     return redirect(url_for("matches"))
+
+
+@app.route("/matches/dismiss-scroll-hint", methods=["POST"])
+@profile_complete
+def dismiss_scroll_rankings_hint():
+    session["scroll_rankings_hint_dismissed"] = True
+    session.modified = True
+    return redirect(url_for("matches"))
+
+
+@app.route("/matches/reorder", methods=["POST"])
+@profile_complete
+def reorder_rankings():
+    data = request.get_json(silent=True) or {}
+    term = data.get("term")
+    order = data.get("order")
+    if not term or not isinstance(order, list):
+        return jsonify({"ok": False, "error": "invalid payload"}), 400
+    try:
+        ids = [int(x) for x in order]
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "invalid ids"}), 400
+    manual = session.setdefault("manual_rank_order", {})
+    manual[term] = ids
+    session.modified = True
+    return jsonify({"ok": True})
 
 
 @app.route("/matches/update_preference", methods=["POST"])
