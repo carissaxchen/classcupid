@@ -341,3 +341,34 @@ def extract_meeting_fields(meetings):
         "end_time": None,
         "meetings_display": None,
     }
+
+
+def parse_clock_to_minutes(raw):
+    """
+    Parse catalog times like '9:45am', '11:00 AM', '13:30', '12:00pm' to minutes from midnight.
+    Returns None if indeterminate.
+    """
+    if raw is None:
+        return None
+    s = str(raw).strip().upper()
+    if not s:
+        return None
+    s = re.sub(r"\s+", "", s)
+    m = re.match(r"^(\d{1,2}):(\d{2})(AM|PM)?$", s)
+    if not m:
+        return None
+    h, mi, mer = int(m.group(1)), int(m.group(2)), m.group(3)
+    if mi >= 60:
+        return None
+    if mer == "PM" and h != 12:
+        h += 12
+    if mer == "AM" and h == 12:
+        h = 0
+    if mer in ("AM", "PM"):
+        if h > 23:
+            return None
+        return h * 60 + mi
+    # No AM/PM: treat as 24-hour (common in JSON startTime/endTime)
+    if h >= 24:
+        return None
+    return h * 60 + mi

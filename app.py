@@ -5,7 +5,7 @@ import re
 import shutil
 from pathlib import Path
 
-from flask import Flask, flash, redirect, render_template, request, session, url_for
+from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy import and_, or_
 import click
 
@@ -13,6 +13,7 @@ from helpers import (
     apology,
     extract_meeting_fields,
     filter_published_instructor_names,
+    parse_clock_to_minutes,
     profile_complete,
 )
 from models import db, Course
@@ -1039,6 +1040,283 @@ def matches():
         total_courses=total_courses,
         available_terms=available_terms if available_terms else [],
     )
+
+
+CALENDAR_DAY_ORDER = ("M", "T", "W", "Th", "F")
+CALENDAR_DAY_LABELS = ("Mon", "Tue", "Wed", "Thu", "Fri")
+
+_SUBJ_ABBR = {
+    "COMPSCI": "CS",
+    "MATH": "MA",
+    "APMTH": "AM",
+    "STAT": "ST",
+    "ECON": "EC",
+    "GOV": "GV",
+    "HIST": "HI",
+    "HUMANITIES": "HU",
+    "HUM": "HU",
+    "SOCIOL": "SO",
+    "CHEM": "CH",
+    "PHYSICS": "PH",
+    "PSYCH": "PY",
+    "BIOLOGY": "BI",
+    "NEURO": "NR",
+    "LING": "LG",
+    "E-PSCI": "ES",
+    "EPS": "ES",
+    "OEB": "OE",
+    "MCB": "MC",
+    "GENED": "GN",
+    "FYSEMR": "FY",
+}
+
+
+def _calendar_short_label(course):
+    cn = (course.course_number or "").strip().split()
+    if not cn:
+        return "Course"
+    subj = cn[0].upper()
+    num = cn[-1]
+    ab = _SUBJ_ABBR.get(subj)
+    if not ab:
+        ab = subj[:2] if len(subj) <= 4 else (subj[0] + subj[-1]).upper()
+    return f"{ab} {num}".strip()
+
+
+def _course_is_calendar_scheduled(course):
+    st = parse_clock_to_minutes(course.start_time)
+    et = parse_clock_to_minutes(course.end_time)
+    if st is None or et is None or et <= st:
+        return False
+    days = course._get_days_set() & set(CALENDAR_DAY_ORDER)
+    return bool(days)
+
+
+def _expand_course_events(course, color_idx):
+    st = parse_clock_to_minutes(course.start_time)
+    et = parse_clock_to_minutes(course.end_time)
+    label = _calendar_short_label(course)
+    title = (course.course_title or "")[:120]
+    out = []
+    for d in CALENDAR_DAY_ORDER:
+        if d not in course._get_days_set():
+            continue
+        day_idx = CALENDAR_DAY_ORDER.index(d)
+        out.append(
+            {
+                "course_id": course.id,
+                "day_idx": day_idx,
+                "start_min": st,
+                "end_min": et,
+                "label": label,
+                "title": title,
+                "color_idx": color_idx % 12,
+            }
+        )
+    return out
+
+
+def _assign_event_lanes(day_events):
+    if not day_events:
+        return
+    events = sorted(day_events, key=lambda e: (e["start_min"], e["end_min"]))
+    lanes_end = []
+    for e in events:
+        lane = None
+        for i, end in enumerate(lanes_end):
+            if end <= e["start_min"]:
+                lane = i
+                lanes_end[i] = e["end_min"]
+                break
+        if lane is None:
+            lane = len(lanes_end)
+            lanes_end.append(e["end_min"])
+        e["lane"] = lane
+    n_lanes = max(len(lanes_end), 1)
+    for e in events:
+        e["lane_count"] = n_lanes
+
+
+def _build_calendar_payload(saved_courses, hidden_ids):
+    tba = []
+    scheduled_courses = []
+    color_by_id = {}
+    ci = 0
+    for c in saved_courses:
+        if _course_is_calendar_scheduled(c):
+            scheduled_courses.append(c)
+            color_by_id[c.id] = ci % 12
+            ci += 1
+        else:
+            tba.append(c)
+
+    raw_events = []
+    for c in scheduled_courses:
+        if c.id in hidden_ids:
+            continue
+        raw_events.extend(_expand_course_events(c, color_by_id[c.id]))
+
+    by_day = [[] for _ in range(5)]
+    for e in raw_events:
+        by_day[e["day_idx"]].append(e)
+
+    for d_events in by_day:
+        _assign_event_lanes(d_events)
+
+    range_start = 9 * 60
+    range_end = 17 * 60
+    if raw_events:
+        mn = min(ev["start_min"] for ev in raw_events)
+        mx = max(ev["end_min"] for ev in raw_events)
+        range_start = max(7 * 60, (mn // 60 - 1) * 60)
+        range_end = min(22 * 60, ((mx + 59) // 60 + 1) * 60)
+        if range_end <= range_start:
+            range_end = range_start + 8 * 60
+
+    h_start = range_start // 60
+    h_end = (range_end + 59) // 60
+    hour_labels = list(range(h_start, h_end + 1))
+    if len(hour_labels) < 2:
+        hour_labels = [9, 17]
+    vis_start = hour_labels[0] * 60
+    vis_end = hour_labels[-1] * 60
+    span = max(vis_end - vis_start, 60)
+    n_calendar_intervals = max(1, len(hour_labels) - 1)
+    calendar_axis_height_px = n_calendar_intervals * 56
+
+    positioned_by_day = [[] for _ in range(5)]
+    gap_pct = 1.0
+    for day_idx in range(5):
+        for e in by_day[day_idx]:
+            top = (e["start_min"] - vis_start) / span * 100
+            height = (e["end_min"] - e["start_min"]) / span * 100
+            lc = max(e["lane_count"], 1)
+            lane = e["lane"]
+            usable = 100.0 - gap_pct * (lc + 1)
+            w = usable / lc
+            left = gap_pct + lane * (w + gap_pct)
+            positioned_by_day[day_idx].append(
+                {
+                    "course_id": e["course_id"],
+                    "label": e["label"],
+                    "title": e["title"],
+                    "color_idx": e["color_idx"],
+                    "top": round(top, 4),
+                    "height": round(max(height, 0.8), 4),
+                    "left": round(left, 4),
+                    "width": round(w, 4),
+                }
+            )
+
+    return {
+        "tba_courses": tba,
+        "scheduled_courses": scheduled_courses,
+        "positioned_by_day": positioned_by_day,
+        "hour_labels": hour_labels,
+        "n_calendar_intervals": n_calendar_intervals,
+        "calendar_axis_height_px": calendar_axis_height_px,
+        "range_start_min": vis_start,
+        "range_end_min": vis_end,
+        "hidden_ids": hidden_ids,
+        "calendar_day_labels": CALENDAR_DAY_LABELS,
+    }
+
+
+@app.route("/calendar")
+@profile_complete
+def calendar():
+    """One-week schedule from saved (heart/star) courses."""
+    raw_profile = session.get("profile") or {}
+    profile = ProfileProxy(raw_profile)
+    user_terms = profile.get_terms()
+    prefs = _course_prefs()
+    saved = []
+    for cid_str, status in prefs.items():
+        if status not in ("heart", "star"):
+            continue
+        c = Course.query.get(int(cid_str))
+        if c and (not user_terms or c.term_description in user_terms):
+            saved.append(c)
+
+    hidden_raw = session.get("calendar_hidden_course_ids") or []
+    hidden_ids = set()
+    for x in hidden_raw:
+        try:
+            hidden_ids.add(int(x))
+        except (TypeError, ValueError):
+            pass
+
+    ctx = _build_calendar_payload(saved, hidden_ids)
+    ctx["all_scheduled_visible"] = bool(ctx["scheduled_courses"]) and all(
+        c.id not in hidden_ids for c in ctx["scheduled_courses"]
+    )
+    return render_template("calendar.html", **ctx)
+
+
+def _saved_course_ids_for_calendar():
+    prefs = _course_prefs()
+    out = set()
+    for cid_str, status in prefs.items():
+        if status in ("heart", "star"):
+            try:
+                out.add(int(cid_str))
+            except ValueError:
+                pass
+    return out
+
+
+@app.route("/calendar/visibility", methods=["POST"])
+@profile_complete
+def calendar_visibility():
+    data = request.get_json(silent=True) or {}
+    cid = data.get("course_id")
+    visible = data.get("visible", True)
+    if cid is None:
+        return jsonify({"ok": False, "error": "missing course_id"}), 400
+    try:
+        cid = int(cid)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "invalid course_id"}), 400
+
+    if cid not in _saved_course_ids_for_calendar():
+        return jsonify({"ok": False, "error": "not a saved course"}), 403
+
+    hidden = [int(x) for x in (session.get("calendar_hidden_course_ids") or [])]
+    if visible:
+        hidden = [x for x in hidden if x != cid]
+    elif cid not in hidden:
+        hidden.append(cid)
+    session["calendar_hidden_course_ids"] = hidden
+    session.modified = True
+    return jsonify({"ok": True})
+
+
+@app.route("/calendar/visibility/batch", methods=["POST"])
+@profile_complete
+def calendar_visibility_batch():
+    data = request.get_json(silent=True) or {}
+    course_ids = data.get("course_ids")
+    visible = data.get("visible", True)
+    if not isinstance(course_ids, list):
+        return jsonify({"ok": False, "error": "course_ids must be a list"}), 400
+    try:
+        ids = {int(x) for x in course_ids}
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "invalid ids"}), 400
+
+    allowed = _saved_course_ids_for_calendar()
+    ids = ids & allowed
+    if not ids:
+        return jsonify({"ok": False, "error": "no valid course ids"}), 400
+
+    hidden = set(int(x) for x in (session.get("calendar_hidden_course_ids") or []))
+    if visible:
+        hidden -= ids
+    else:
+        hidden |= ids
+    session["calendar_hidden_course_ids"] = list(hidden)
+    session.modified = True
+    return jsonify({"ok": True})
 
 
 @app.route("/matches/compare", methods=["POST"])
