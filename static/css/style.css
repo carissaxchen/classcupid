@@ -174,9 +174,9 @@ body {
 }
 
 .calendar-sidebar {
-    width: min(300px, 28vw);
+    width: min(240px, 22vw);
     flex-shrink: 0;
-    padding: 1.25rem 1rem;
+    padding: 1.1rem 0.75rem;
     border-right: 1px solid #ddd;
     background: #fafafa;
     overflow-y: auto;
@@ -243,6 +243,12 @@ body {
     margin: 0;
 }
 
+.calendar-sidebar-divider {
+    border: none;
+    border-top: 1px solid #ddd;
+    margin: 0.5rem 0 0.75rem;
+}
+
 .calendar-check-row {
     display: flex;
     align-items: center;
@@ -287,7 +293,7 @@ body {
 .calendar-day-headers {
     flex: 1;
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--cal-days, 5), minmax(0, 1fr));
     gap: 0;
     text-align: center;
     font-size: 0.72rem;
@@ -335,11 +341,11 @@ body {
 }
 
 .calendar-columns--week {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--cal-days, 5), minmax(0, 1fr));
 }
 
 .calendar-day-headers--week {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--cal-days, 5), minmax(0, 1fr));
 }
 
 .calendar-day-col {
@@ -412,7 +418,7 @@ body {
 
     .calendar-columns--week {
         overflow-x: auto;
-        grid-template-columns: repeat(5, minmax(88px, 1fr));
+        grid-template-columns: repeat(var(--cal-days, 5), minmax(88px, 1fr));
     }
 }
 

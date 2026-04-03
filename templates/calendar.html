@@ -4,8 +4,26 @@
 
 {% block content %}
 <div class="calendar-page" data-cal-batch-url="{{ url_for('calendar_visibility_batch') }}" data-cal-url="{{ url_for('calendar_visibility') }}">
-    <div class="calendar-layout" style="--cal-axis-px: {{ calendar_axis_height_px }}px; --cal-intervals: {{ n_calendar_intervals }};">
+    <div class="calendar-layout" style="--cal-axis-px: {{ calendar_axis_height_px }}px; --cal-intervals: {{ n_calendar_intervals }}; --cal-days: {{ n_calendar_days }};">
         <aside class="calendar-sidebar">
+            <section class="calendar-sidebar-section">
+                <h3 class="calendar-sidebar-title">Scheduled Classes</h3>
+                {% if scheduled_courses %}
+                <label class="calendar-check-row calendar-check-row--master">
+                    <input type="checkbox" class="calendar-checkbox" id="cal-select-all" {% if all_scheduled_visible %}checked{% endif %}>
+                    <span>Select all</span>
+                </label>
+                <hr class="calendar-sidebar-divider" aria-hidden="true">
+                {% for c in scheduled_courses %}
+                <label class="calendar-check-row">
+                    <input type="checkbox" class="calendar-checkbox cal-class-toggle" data-course-id="{{ c.id }}" {% if c.id not in hidden_ids %}checked{% endif %}>
+                    <span>{{ c.course_number or "Course" }}</span>
+                </label>
+                {% endfor %}
+                {% else %}
+                <p class="calendar-empty-hint">Save courses with meeting times on Discover to see them here.</p>
+                {% endif %}
+            </section>
             <section class="calendar-sidebar-section">
                 <h3 class="calendar-sidebar-title">Schedule TBA</h3>
                 {% if tba_courses %}
@@ -23,23 +41,6 @@
                 </ul>
                 {% else %}
                 <p class="calendar-empty-hint">No saved classes without a firm weekly time.</p>
-                {% endif %}
-            </section>
-            <section class="calendar-sidebar-section">
-                <h3 class="calendar-sidebar-title">Scheduled Classes</h3>
-                {% if scheduled_courses %}
-                <label class="calendar-check-row calendar-check-row--master">
-                    <input type="checkbox" class="calendar-checkbox" id="cal-select-all" {% if all_scheduled_visible %}checked{% endif %}>
-                    <span>Select all</span>
-                </label>
-                {% for c in scheduled_courses %}
-                <label class="calendar-check-row">
-                    <input type="checkbox" class="calendar-checkbox cal-class-toggle" data-course-id="{{ c.id }}" {% if c.id not in hidden_ids %}checked{% endif %}>
-                    <span>{{ c.course_number or "Course" }}</span>
-                </label>
-                {% endfor %}
-                {% else %}
-                <p class="calendar-empty-hint">Save courses with meeting times on Discover to see them here.</p>
                 {% endif %}
             </section>
         </aside>
@@ -60,7 +61,7 @@
                     {% endfor %}
                 </div>
                 <div class="calendar-columns calendar-columns--week">
-                    {% for day_idx in range(5) %}
+                    {% for day_idx in range(n_calendar_days) %}
                     <div class="calendar-day-col">
                         <div class="calendar-day-grid">
                             {% for ev in positioned_by_day[day_idx] %}

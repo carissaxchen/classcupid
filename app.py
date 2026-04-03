@@ -1042,8 +1042,9 @@ def matches():
     )
 
 
-CALENDAR_DAY_ORDER = ("M", "T", "W", "Th", "F")
-CALENDAR_DAY_LABELS = ("Mon", "Tue", "Wed", "Thu", "Fri")
+CALENDAR_DAY_ORDER = ("M", "T", "W", "Th", "F", "S")
+CALENDAR_DAY_LABELS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+CALENDAR_NUM_DAYS = len(CALENDAR_DAY_ORDER)
 
 _SUBJ_ABBR = {
     "COMPSCI": "CS",
@@ -1116,6 +1117,18 @@ def _expand_course_events(course, color_idx):
     return out
 
 
+def _max_concurrent_during_event(e, day_events):
+    """Max number of events overlapping at any minute during e's [start, end)."""
+    s, end = e["start_min"], e["end_min"]
+    if end <= s:
+        return 1
+    best = 1
+    for t in range(s, end):
+        c = sum(1 for o in day_events if o["start_min"] <= t < o["end_min"])
+        best = max(best, c)
+    return max(best, 1)
+
+
 def _assign_event_lanes(day_events):
     if not day_events:
         return
@@ -1132,9 +1145,10 @@ def _assign_event_lanes(day_events):
             lane = len(lanes_end)
             lanes_end.append(e["end_min"])
         e["lane"] = lane
-    n_lanes = max(len(lanes_end), 1)
     for e in events:
-        e["lane_count"] = n_lanes
+        e["lane_count"] = _max_concurrent_during_event(e, day_events)
+        if e["lane_count"] == 1:
+            e["lane"] = 0
 
 
 def _build_calendar_payload(saved_courses, hidden_ids):
@@ -1156,7 +1170,7 @@ def _build_calendar_payload(saved_courses, hidden_ids):
             continue
         raw_events.extend(_expand_course_events(c, color_by_id[c.id]))
 
-    by_day = [[] for _ in range(5)]
+    by_day = [[] for _ in range(CALENDAR_NUM_DAYS)]
     for e in raw_events:
         by_day[e["day_idx"]].append(e)
 
@@ -1184,9 +1198,9 @@ def _build_calendar_payload(saved_courses, hidden_ids):
     n_calendar_intervals = max(1, len(hour_labels) - 1)
     calendar_axis_height_px = n_calendar_intervals * 56
 
-    positioned_by_day = [[] for _ in range(5)]
+    positioned_by_day = [[] for _ in range(CALENDAR_NUM_DAYS)]
     gap_pct = 1.0
-    for day_idx in range(5):
+    for day_idx in range(CALENDAR_NUM_DAYS):
         for e in by_day[day_idx]:
             top = (e["start_min"] - vis_start) / span * 100
             height = (e["end_min"] - e["start_min"]) / span * 100
@@ -1219,6 +1233,7 @@ def _build_calendar_payload(saved_courses, hidden_ids):
         "range_end_min": vis_end,
         "hidden_ids": hidden_ids,
         "calendar_day_labels": CALENDAR_DAY_LABELS,
+        "n_calendar_days": CALENDAR_NUM_DAYS,
     }
 
 
