@@ -1,0 +1,260 @@
+{
+    "courses": [
+      {
+        "courseTitle": "Act Natural",
+        "instructors": ["David Levine"],
+        "genEdCode": "GENED 1050",
+        "semester": "Fall 2026",
+        "meetingTimes": "Wed, 12:00 PM – 2:45 PM",
+        "categories": ["Aesthetics & Culture"]
+      },
+      {
+        "courseTitle": "Can We Know Our Past?",
+        "instructors": ["Rowan Flad"],
+        "genEdCode": "GENED 1105",
+        "semester": "Fall 2026",
+        "meetingTimes": "Mon & Wed, 10:30 AM – 11:45 AM",
+        "categories": ["Science & Technology in Society", "Histories, Societies, Individuals"]
+      },
+      {
+        "courseTitle": "Climate Crossroads",
+        "instructors": ["James G. Anderson"],
+        "genEdCode": "GENED 1167",
+        "semester": "Fall 2026",
+        "meetingTimes": "Mon & Wed, 1:30 PM – 2:45 PM",
+        "categories": ["Science & Technology in Society"]
+      },
+      {
+        "courseTitle": "Deep History",
+        "instructors": ["Matthew J. Liebmann", "Daniel Lord Smail"],
+        "genEdCode": "GENED 1044",
+        "semester": "Fall 2026",
+        "meetingTimes": "Mon & Wed, 12:00 PM – 1:15 PM",
+        "categories": ["Histories, Societies, Individuals"]
+      },
+      {
+        "courseTitle": "Ethics in the Age of AI",
+        "instructors": ["Michael Sandel"],
+        "genEdCode": "GENED 1210",
+        "semester": "Fall 2026",
+        "meetingTimes": "Tue, 9:45 AM – 11:45 AM",
+        "categories": ["Ethics & Civics"]
+      },
+      {
+        "courseTitle": "Foundations of NeuroAI: Synergies Between the Sciences of Natural and Artificial Intelligence",
+        "instructors": ["Talia Konkle"],
+        "genEdCode": "GENED 1201",
+        "semester": "Fall 2026",
+        "meetingTimes": "Tue, 12:00 PM – 2:45 PM",
+        "categories": ["Science & Technology in Society"]
+      },
+      {
+        "courseTitle": "Happiness",
+        "instructors": ["Susanna Rinard"],
+        "genEdCode": "GENED 1025",
+        "semester": "Fall 2026",
+        "meetingTimes": "Tue & Thu, 1:30 PM – 2:30 PM",
+        "categories": ["Ethics & Civics"]
+      },
+      {
+        "courseTitle": "How the Germans Embraced Hitler",
+        "instructors": ["David Spreen"],
+        "genEdCode": "GENED 1203",
+        "semester": "Fall 2026",
+        "meetingTimes": "Tue & Thu, 10:30 AM – 11:45 AM",
+        "categories": ["Histories, Societies, Individuals"]
+      },
+      {
+        "courseTitle": "Human Nature",
+        "instructors": ["Martin Surbeck"],
+        "genEdCode": "GENED 1056",
+        "semester": "Fall 2026",
+        "meetingTimes": "Tue & Thu, 9:00 AM – 10:15 AM",
+        "categories": ["Science & Technology in Society"]
+      },
+      {
+        "courseTitle": "Is the U.S. Civil War Still Being Fought?",
+        "instructors": ["John Stauffer"],
+        "genEdCode": "GENED 1133",
+        "semester": "Fall 2026",
+        "meetingTimes": "Mon & Wed, 1:30 PM – 2:45 PM",
+        "categories": ["Histories, Societies, Individuals"]
+      },
+      {
+        "courseTitle": "Learning and Unlearning",
+        "instructors": ["Liao Cheng"],
+        "genEdCode": "GENED 1199",
+        "semester": "Fall 2026",
+        "meetingTimes": "Thu, 12:00 PM – 2:00 PM",
+        "categories": ["Science & Technology in Society"]
+      },
+      {
+        "courseTitle": "Medical Ethics and History",
+        "instructors": ["David Shumway Jones"],
+        "genEdCode": "GENED 1116",
+        "semester": "Fall 2026",
+        "meetingTimes": "Tue & Thu, 10:30 AM – 11:45 AM",
+        "categories": ["Ethics & Civics", "Histories, Societies, Individuals"]
+      },
+      {
+        "courseTitle": "Mental Health and Mental Illness through Literature and the Arts",
+        "instructors": ["Karen Thornber"],
+        "genEdCode": "GENED 1144",
+        "semester": "Fall 2026",
+        "meetingTimes": "Tue & Thu, 9:00 AM – 10:15 AM",
+        "categories": ["Aesthetics & Culture"]
+      },
+      {
+        "courseTitle": "Music from Earth",
+        "instructors": ["Alexander Rehding"],
+        "genEdCode": "GENED 1006",
+        "semester": "Fall 2026",
+        "meetingTimes": "",
+        "categories": ["Aesthetics & Culture"]
+      },
+      {
+        "courseTitle": "Natural Disasters",
+        "instructors": ["Brendan Meade"],
+        "genEdCode": "GENED 1098",
+        "semester": "Fall 2026",
+        "meetingTimes": "Mon & Wed, 10:30 AM – 11:45 AM",
+        "categories": ["Science & Technology in Society"]
+      },
+      {
+        "courseTitle": "Negotiation and Conflict Management: From the Interpersonal to the International",
+        "instructors": ["Daniel Shapiro"],
+        "genEdCode": "GENED 1033",
+        "semester": "Fall 2026",
+        "meetingTimes": "Mon & Wed, 4:30 PM – 5:45 PM",
+        "categories": ["Ethics & Civics"]
+      },
+      {
+        "courseTitle": "Painting’s Doubt: A Studio Course",
+        "instructors": ["Matt Saunders"],
+        "genEdCode": "GENED 1114",
+        "semester": "Fall 2026",
+        "meetingTimes": "Wed, 1:30 PM – 2:45 PM",
+        "categories": ["Aesthetics & Culture"]
+      },
+      {
+        "courseTitle": "Race in a Polarized America",
+        "instructors": ["Jennifer L. Hochschild"],
+        "genEdCode": "GENED 1052",
+        "semester": "Fall 2026",
+        "meetingTimes": "Tue & Thu, 1:30 PM – 2:45 PM",
+        "categories": ["Histories, Societies, Individuals"]
+      },
+      {
+        "courseTitle": "Science and Cooking: From Haute Cuisine to Soft Matter Science",
+        "instructors": ["David Weitz", "Pia Sorensen"],
+        "genEdCode": "GENED 1104",
+        "semester": "Fall 2026",
+        "meetingTimes": "Tue & Thu, 12:00 PM – 1:15 PM",
+        "categories": ["Science & Technology in Society"]
+      },
+      {
+        "courseTitle": "Sexuality in Literature: From Giovanni’s Room to Fun Home",
+        "instructors": ["Linda Schlossberg"],
+        "genEdCode": "GENED 1176",
+        "semester": "Fall 2026",
+        "meetingTimes": "Tue & Thu, 12:00 PM – 1:15 PM",
+        "categories": ["Aesthetics & Culture"]
+      },
+      {
+        "courseTitle": "The Ancient Greek Hero",
+        "instructors": ["Gregory Nagy"],
+        "genEdCode": "GENED 1074",
+        "semester": "Fall 2026",
+        "meetingTimes": "Mon & Wed, 12:00 PM – 1:15 PM",
+        "categories": ["Aesthetics & Culture"]
+      },
+      {
+        "courseTitle": "The Border: Race, Politics and Health in Modern Mexico",
+        "instructors": ["Gabriela Soto Laveaga"],
+        "genEdCode": "GENED 1089",
+        "semester": "Fall 2026",
+        "meetingTimes": "Tue & Thu, 9:00 AM – 10:15 AM",
+        "categories": ["Histories, Societies, Individuals"]
+      },
+      {
+        "courseTitle": "The Caribbean Crucible",
+        "instructors": ["Orlando Patterson"],
+        "genEdCode": "GENED 1019",
+        "semester": "Fall 2026",
+        "meetingTimes": "Mon & Wed, 1:30 PM – 2:30 PM",
+        "categories": ["Histories, Societies, Individuals"]
+      },
+      {
+        "courseTitle": "The Global Heart Disease Epidemic",
+        "instructors": ["Richard Lee"],
+        "genEdCode": "GENED 1053",
+        "semester": "Fall 2026",
+        "meetingTimes": "Mon & Wed, 9:00 AM – 10:15 AM",
+        "categories": ["Science & Technology in Society"]
+      },
+      {
+        "courseTitle": "The Philosopher and the Tyrant",
+        "instructors": ["David Damrosch"],
+        "genEdCode": "GENED 1030",
+        "semester": "Fall 2026",
+        "meetingTimes": "Mon & Wed, 3:00 PM – 4:15 PM",
+        "categories": ["Ethics & Civics"]
+      },
+      {
+        "courseTitle": "The Political Economy of Globalization",
+        "instructors": ["Robert Lawrence", "Dani Rodrik"],
+        "genEdCode": "GENED 1120",
+        "semester": "Fall 2026",
+        "meetingTimes": "Wed, 3:00 PM – 5:00 PM",
+        "categories": ["Histories, Societies, Individuals"]
+      },
+      {
+        "courseTitle": "The Power and Beauty of Being In-Between: The Story of Armenia",
+        "instructors": ["Christina Maranci"],
+        "genEdCode": "GENED 1185",
+        "semester": "Fall 2026",
+        "meetingTimes": "Tue & Thu, 10:30 AM – 11:45 AM",
+        "categories": ["Aesthetics & Culture"]
+      },
+      {
+        "courseTitle": "The Social Responsibilities of Universities",
+        "instructors": ["Julie Reuben"],
+        "genEdCode": "GENED 1122",
+        "semester": "Fall 2026",
+        "meetingTimes": "Wed, 9:45 AM – 11:45 AM",
+        "categories": ["Ethics & Civics"]
+      },
+      {
+        "courseTitle": "Tradition in Everyday Life",
+        "instructors": ["Sarah Craycraft"],
+        "genEdCode": "GENED 1196",
+        "semester": "Fall 2026",
+        "meetingTimes": "Tue & Thu, 1:30 PM – 2:45 PM",
+        "categories": ["Aesthetics & Culture"]
+      },
+      {
+        "courseTitle": "Who Lives, Who Dies: Reimagining Global Health",
+        "instructors": ["Lindsey Zeve", "Jason Silverstein", "Salmaan Keshavjee", "Luke Messac"],
+        "genEdCode": "GENED 1093",
+        "semester": "Fall 2026",
+        "meetingTimes": "Tue & Thu, 10:30 AM – 11:45 AM",
+        "categories": ["Science & Technology in Society"]
+      },
+      {
+        "courseTitle": "Whose culture is it anyway? Latin America’s Politics of Memory",
+        "instructors": ["Alejandra Vela Martínez"],
+        "genEdCode": "GENED 1207",
+        "semester": "Fall 2026",
+        "meetingTimes": "Tue & Thu, 12:00 PM – 1:15 PM",
+        "categories": ["Histories, Societies, Individuals"]
+      },
+      {
+        "courseTitle": "Why Is There No Cure for Health?",
+        "instructors": ["David M. Cutler"],
+        "genEdCode": "GENED 1079",
+        "semester": "Fall 2026",
+        "meetingTimes": "Tue & Thu, 12:00 PM – 1:15 PM",
+        "categories": ["Science & Technology in Society"]
+      }
+    ]
+  }

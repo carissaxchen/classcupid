@@ -17,18 +17,24 @@
                 <img src="{{ url_for('static', filename='images/Class Cupid Text-4.png') }}" alt="Class Cupid" class="logo-text-image">
             </div>
             <div class="nav-links">
-                <a href="{{ url_for('discover') }}" class="nav-link">
+                <a href="{{ url_for('discover') }}" class="nav-link{% if request.endpoint == 'discover' %} nav-link-active{% endif %}">
                     <img src="{{ url_for('static', filename='images/icons/fire.svg') }}" alt="" class="nav-icon">
                     <span>Discover</span>
                 </a>
-                <a href="{{ url_for('matches') }}" class="nav-link">
+                <a href="{{ url_for('matches') }}" class="nav-link{% if request.endpoint == 'matches' %} nav-link-active{% endif %}">
                     <img src="{{ url_for('static', filename='images/icons/compass.svg') }}" alt="" class="nav-icon">
                     <span>Matches</span>
                 </a>
+                {% if profile and profile.get('affiliation') %}
+                <a href="{{ url_for('calendar') }}" class="nav-link{% if request.endpoint == 'calendar' %} nav-link-active{% endif %}">
+                    <img src="{{ url_for('static', filename='images/icons/calendar.svg') }}" alt="" class="nav-icon">
+                    <span>Calendar</span>
+                </a>
+                {% endif %}
             </div>
             <div class="nav-auth">
                 {% if profile and profile.get('affiliation') %}
-                    <a href="{{ url_for('profile') }}" class="nav-link">
+                    <a href="{{ url_for('profile') }}" class="nav-link{% if request.endpoint == 'profile' %} nav-link-active{% endif %}">
                         <img src="{{ url_for('static', filename='images/icons/user-circle.svg') }}" alt="" class="nav-icon">
                         <span>Preferences</span>
                     </a>
@@ -54,7 +60,7 @@
     <footer class="site-footer">
         <div class="footer-container">
             <div class="footer-text">
-                <p>Code © 2025 Carissa Chen and Haotian Pan</p>
+                <p>By CC '29 and HP '29</p>
                 <p>Course metadata © 2025-2026 President and Fellows of Harvard College</p>
             </div>
             <div class="footer-logo-container">

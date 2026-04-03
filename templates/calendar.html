@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Calendar - Class Cupid{% endblock %}
+
+{% block content %}
+<div class="calendar-page" data-cal-batch-url="{{ url_for('calendar_visibility_batch') }}" data-cal-url="{{ url_for('calendar_visibility') }}">
+    <div class="calendar-layout" style="--cal-axis-px: {{ calendar_axis_height_px }}px; --cal-intervals: {{ n_calendar_intervals }}; --cal-days: {{ n_calendar_days }};">
+        <aside class="calendar-sidebar">
+            <section class="calendar-sidebar-section">
+                <h3 class="calendar-sidebar-title">Scheduled Classes</h3>
+                {% if scheduled_courses %}
+                <label class="calendar-check-row calendar-check-row--master">
+                    <input type="checkbox" class="calendar-checkbox" id="cal-select-all" {% if all_scheduled_visible %}checked{% endif %}>
+                    <span>Select all</span>
+                </label>
+                <hr class="calendar-sidebar-divider" aria-hidden="true">
+                {% for c in scheduled_courses %}
+                <label class="calendar-check-row">
+                    <input type="checkbox" class="calendar-checkbox cal-class-toggle" data-course-id="{{ c.id }}" {% if c.id not in hidden_ids %}checked{% endif %}>
+                    <span>{{ c.course_number or "Course" }}</span>
+                </label>
+                {% endfor %}
+                {% else %}
+                <p class="calendar-empty-hint">Save courses with meeting times on Discover to see them here.</p>
+                {% endif %}
+            </section>
+            <section class="calendar-sidebar-section">
+                <h3 class="calendar-sidebar-title">Schedule TBA</h3>
+                {% if tba_courses %}
+                <ul class="calendar-course-list calendar-course-list--tba">
+                    {% for c in tba_courses %}
+                    <li class="calendar-course-line">
+                        <span class="calendar-course-code">{{ c.course_number or "Course" }}</span>
+                        {% if c.meetings_display %}
+                        <span class="calendar-course-meta">{{ c.meetings_display[:60] }}{% if c.meetings_display|length > 60 %}…{% endif %}</span>
+                        {% else %}
+                        <span class="calendar-course-meta">Time or days not set</span>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="calendar-empty-hint">No saved classes without a firm weekly time.</p>
+                {% endif %}
+            </section>
+        </aside>
+
+        <div class="calendar-board">
+            <div class="calendar-board-header">
+                <div class="calendar-corner"></div>
+                <div class="calendar-day-headers calendar-day-headers--week">
+                    {% for label in calendar_day_labels %}
+                    <span>{{ label }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="calendar-board-body">
+                <div class="calendar-time-axis">
+                    {% for h in hour_labels[:-1] %}
+                    <div class="calendar-time-slot">{{ h }}:00</div>
+                    {% endfor %}
+                </div>
+                <div class="calendar-columns calendar-columns--week">
+                    {% for day_idx in range(n_calendar_days) %}
+                    <div class="calendar-day-col">
+                        <div class="calendar-day-grid">
+                            {% for ev in positioned_by_day[day_idx] %}
+                            <div class="cal-event cal-event--c{{ ev.color_idx }} cal-event-block"
+                                 style="top: {{ ev.top }}%; height: {{ ev.height }}%; left: {{ ev.left }}%; width: {{ ev.width }}%;"
+                                 data-course-id="{{ ev.course_id }}"
+                                 title="{{ ev.title }}">{{ ev.label }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if scheduled_courses %}
+<script>
+(function () {
+    var root = document.querySelector('.calendar-page');
+    if (!root) return;
+    var batchUrl = root.getAttribute('data-cal-batch-url');
+    var singleUrl = root.getAttribute('data-cal-url');
+    var master = document.getElementById('cal-select-all');
+    var toggles = document.querySelectorAll('.cal-class-toggle');
+    var blocks = document.querySelectorAll('.cal-event-block');
+
+    function setBlocksVisible(courseId, visible) {
+        var id = String(courseId);
+        blocks.forEach(function (el) {
+            if (el.getAttribute('data-course-id') === id) {
+                el.classList.toggle('cal-event--hidden', !visible);
+            }
+        });
+    }
+
+    function postJSON(url, body) {
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(body)
+        });
+    }
+
+    function syncMaster() {
+        if (!master) return;
+        var anyOff = false;
+        toggles.forEach(function (cb) { if (!cb.checked) anyOff = true; });
+        master.checked = !anyOff;
+    }
+
+    toggles.forEach(function (cb) {
+        cb.addEventListener('change', function () {
+            var id = parseInt(cb.getAttribute('data-course-id'), 10);
+            var vis = cb.checked;
+            setBlocksVisible(id, vis);
+            syncMaster();
+            postJSON(singleUrl, { course_id: id, visible: vis });
+        });
+    });
+
+    if (master) {
+        master.addEventListener('change', function () {
+            var vis = master.checked;
+            var ids = [];
+            toggles.forEach(function (cb) {
+                cb.checked = vis;
+                ids.push(parseInt(cb.getAttribute('data-course-id'), 10));
+                setBlocksVisible(cb.getAttribute('data-course-id'), vis);
+            });
+            if (ids.length && batchUrl) {
+                postJSON(batchUrl, { course_ids: ids, visible: vis });
+            }
+        });
+    }
+})();
+</script>
+{% endif %}
+{% endblock %}
