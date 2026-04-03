@@ -12,6 +12,7 @@ OUT = ROOT / "catalog.db"
 OUT.unlink(missing_ok=True)
 
 os.environ.setdefault("SECRET_KEY", "build")
+os.environ["SQLALCHEMY_DATABASE_URI_OVERRIDE"] = f"sqlite:///{OUT}"
 
 from app import app
 

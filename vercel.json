@@ -1,3 +1,10 @@
 {
-  "buildCommand": "pip install -r requirements.txt && python3 scripts/build_catalog.py"
+  "buildCommand": "pip install -r requirements.txt && python3 scripts/build_catalog.py",
+  "builds": [
+    { "src": "api/index.py", "use": "@vercel/python" }
+  ],
+  "routes": [
+    { "src": "/static/(.*)", "dest": "/static/$1" },
+    { "src": "/(.*)", "dest": "/api/index.py" }
+  ]
 }

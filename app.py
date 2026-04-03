@@ -20,6 +20,9 @@ from models import db, Course
 
 
 def _database_uri():
+    override = os.environ.get("SQLALCHEMY_DATABASE_URI_OVERRIDE")
+    if override:
+        return override
     root_dir = Path(__file__).resolve().parent
     bundled = root_dir / "catalog.db"
     if os.environ.get("VERCEL"):
