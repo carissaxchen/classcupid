@@ -956,20 +956,59 @@ def discover_undo():
     return redirect(url_for("discover"))
 
 
+@app.route("/search")
+@profile_complete
+def search():
+    """Full catalog (ignores profile filters); client-side text/term filtering."""
+    courses = (
+        Course.query.order_by(Course.course_number.asc(), Course.term_description.asc()).all()
+    )
+    saved_ids = {
+        int(k)
+        for k, v in _course_prefs().items()
+        if v in ("heart", "star")
+    }
+    return render_template(
+        "search.html",
+        courses=courses,
+        saved_ids=saved_ids,
+        no_pool=len(courses) == 0,
+    )
+
+
+@app.route("/search/save", methods=["POST"])
+@profile_complete
+def search_save():
+    """Same as heart on Discover: save to session prefs for Matches / Calendar."""
+    cid = request.form.get("course_id", type=int)
+    if not cid:
+        flash("Could not add course.", "error")
+        return redirect(url_for("search"))
+    course = Course.query.get(cid)
+    if not course:
+        flash("Course not found.", "error")
+        return redirect(url_for("search"))
+    prefs = _course_prefs()
+    stack = _swipe_stack()
+    prefs[str(cid)] = "heart"
+    stack.append(cid)
+    _trim_session_prefs()
+    session.modified = True
+    flash("Added to your matches.", "success")
+    return redirect(url_for("search"))
+
+
 @app.route("/matches")
 @profile_complete
 def matches():
     """Matches page with sorting game and saved classes"""
-    raw_profile = session.get("profile") or {}
-    profile = ProfileProxy(raw_profile)
-    user_terms = profile.get_terms()
     prefs = _course_prefs()
     saved_rows = []
     for cid_str, status in prefs.items():
         if status not in ("heart", "star"):
             continue
         c = Course.query.get(int(cid_str))
-        if c and (not user_terms or c.term_description in user_terms):
+        if c:
             saved_rows.append(SavedPref(c, status))
 
     courses_by_term = {}
@@ -1297,16 +1336,13 @@ def _build_calendar_payload(saved_courses, hidden_ids):
 @profile_complete
 def calendar():
     """One-week schedule from saved (heart/star) courses."""
-    raw_profile = session.get("profile") or {}
-    profile = ProfileProxy(raw_profile)
-    user_terms = profile.get_terms()
     prefs = _course_prefs()
     saved = []
     for cid_str, status in prefs.items():
         if status not in ("heart", "star"):
             continue
         c = Course.query.get(int(cid_str))
-        if c and (not user_terms or c.term_description in user_terms):
+        if c:
             saved.append(c)
 
     hidden_raw = session.get("calendar_hidden_course_ids") or []

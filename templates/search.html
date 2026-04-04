@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Search - Class Cupid{% endblock %}
+
+{% block content %}
+<div class="search-container" id="searchPage"
+     data-total="{{ courses|length if courses else 0 }}">
+    <h1 class="search-page-title">Search</h1>
+
+    <div class="search-toolbar" role="search">
+        <label class="search-field-label" for="search-live">
+            <span class="visually-hidden">Filter courses as you type</span>
+            <input type="search" id="search-live" class="search-input"
+                   placeholder="Filter by course code, title, or instructor…" autocomplete="off" enterkeyhint="search">
+        </label>
+        <div class="search-term-wrap">
+            <label class="visually-hidden" for="search-term">Term</label>
+            <select id="search-term" class="search-term-select" aria-label="Filter by semester">
+                <option value="any" selected>Any</option>
+                <option value="fall">Fall</option>
+                <option value="spring">Spring</option>
+            </select>
+        </div>
+    </div>
+
+    {% if no_pool %}
+    <div class="search-empty-panel">
+        <p>No courses are loaded in the catalog yet.</p>
+    </div>
+    {% else %}
+    <div class="search-filter-status">
+        <button type="button" class="search-clear-link search-clear-btn" id="search-clear">Clear filters</button>
+        <span class="search-filters-badge" id="search-count-badge" aria-live="polite"></span>
+    </div>
+
+    <div class="search-table-wrap">
+        <table class="search-results-table">
+            <thead>
+                <tr>
+                    <th scope="col">Course #</th>
+                    <th scope="col">Course title</th>
+                    <th scope="col">Instructors</th>
+                    <th scope="col">Meeting time</th>
+                    <th scope="col"><span class="visually-hidden">Save</span></th>
+                </tr>
+            </thead>
+            <tbody id="search-tbody">
+                {% for course in courses %}
+                {% set td = course.term_description or '' %}
+                {% set term_key = 'fall' if 'Fall' in td else ('spring' if 'Spring' in td else 'other') %}
+                {% set search_blob = ((course.course_number or '') ~ ' ' ~ (course.course_title or '') ~ ' ' ~ (course.instructor_name or ''))|lower %}
+                <tr class="search-result-row" data-search="{{ search_blob|e }}" data-term="{{ term_key }}">
+                    <td class="search-col-num"><span class="search-row-accent" aria-hidden="true"></span>{{ course.course_number or "—" }}</td>
+                    <td class="search-col-title">{{ course.course_title or "—" }}</td>
+                    <td class="search-col-inst">{{ course.instructor_name or "TBA" }}</td>
+                    <td class="search-col-time">
+                        {{ course.term_description or "" }}{% if course.term_description %}: {% endif %}
+                        {% if course.meetings_display %}
+                            {{ course.meetings_display }}
+                        {% elif course.start_time and course.end_time %}
+                            {{ course.start_time }} – {{ course.end_time }}
+                        {% else %}
+                            TBA
+                        {% endif %}
+                    </td>
+                    <td class="search-col-action">
+                        {% if course.id in saved_ids %}
+                        <span class="search-saved-label">Saved</span>
+                        {% else %}
+                        <form method="post" action="{{ url_for('search_save') }}" class="search-add-form">
+                            <input type="hidden" name="course_id" value="{{ course.id }}">
+                            <button type="submit" class="search-add-btn">Add</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                <tr class="search-no-match-row" id="search-no-matches" hidden>
+                    <td colspan="5" class="search-no-rows">No courses match your filters.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <p class="search-hint search-hint--below">Full catalog, sorted by course number. <strong>Add</strong> saves a course the same way as a heart on Discover (Saved Classes on Matches).</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var root = document.getElementById('searchPage');
+    var input = document.getElementById('search-live');
+    if (!root || !input) return;
+    var termSel = document.getElementById('search-term');
+    var badge = document.getElementById('search-count-badge');
+    var clearBtn = document.getElementById('search-clear');
+    var noMatches = document.getElementById('search-no-matches');
+    var rows = root.querySelectorAll('tr.search-result-row');
+    var total = rows.length;
+
+    function applyFilters() {
+        var q = (input && input.value || '').trim().toLowerCase();
+        var term = termSel ? termSel.value : 'any';
+        var visible = 0;
+        rows.forEach(function (row) {
+            var blob = (row.getAttribute('data-search') || '').toLowerCase();
+            var rowTerm = row.getAttribute('data-term') || 'other';
+            var okQ = !q || blob.indexOf(q) !== -1;
+            var okT = term === 'any' || rowTerm === term;
+            var show = okQ && okT;
+            row.hidden = !show;
+            if (show) visible++;
+        });
+        if (noMatches) noMatches.hidden = visible > 0;
+        if (badge) {
+            badge.textContent = visible === total
+                ? total + ' course' + (total === 1 ? '' : 's')
+                : 'Showing ' + visible + ' of ' + total;
+        }
+    }
+
+    if (input) input.addEventListener('input', applyFilters);
+    if (termSel) termSel.addEventListener('change', applyFilters);
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+            if (input) input.value = '';
+            if (termSel) termSel.value = 'any';
+            applyFilters();
+            if (input) input.focus();
+        });
+    }
+    applyFilters();
+})();
+</script>
+{% endblock %}
