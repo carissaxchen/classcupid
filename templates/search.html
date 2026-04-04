@@ -23,6 +23,58 @@
         </div>
     </div>
 
+    <div class="search-adv-toggle-wrap">
+        <button type="button" class="search-adv-toggle" id="adv-toggle" aria-expanded="false" aria-controls="adv-panel">
+            <span class="search-adv-toggle-label">Advanced Filters</span>
+            <span class="search-adv-toggle-arrow" aria-hidden="true">▸</span>
+        </button>
+    </div>
+
+    <div class="search-adv-panel" id="adv-panel" hidden>
+        <div class="search-adv-section">
+            <h4 class="search-adv-heading">Days of Week</h4>
+            <div class="search-day-btns" id="day-btns">
+                <button type="button" class="search-day-btn" data-day="M">Mon</button>
+                <button type="button" class="search-day-btn" data-day="T">Tue</button>
+                <button type="button" class="search-day-btn" data-day="W">Wed</button>
+                <button type="button" class="search-day-btn" data-day="Th">Thu</button>
+                <button type="button" class="search-day-btn" data-day="F">Fri</button>
+                <button type="button" class="search-day-btn" data-day="S">Sat</button>
+            </div>
+        </div>
+
+        <div class="search-adv-section">
+            <h4 class="search-adv-heading">Time of Day</h4>
+            <div class="search-time-presets" id="time-presets">
+                <button type="button" class="search-preset-btn" data-start="540" data-end="720">Morning (9am–12pm)</button>
+                <button type="button" class="search-preset-btn" data-start="720" data-end="1020">Afternoon (12pm–5pm)</button>
+                <button type="button" class="search-preset-btn" data-start="1020" data-end="1260">Evening (5pm–9pm)</button>
+            </div>
+        </div>
+
+        <div class="search-adv-section">
+            <h4 class="search-adv-heading">Custom Time Range</h4>
+            <div class="search-time-range">
+                <label class="search-time-label">
+                    Start after
+                    <select id="time-start" class="search-time-select">
+                        <option value="">Any time</option>
+                    </select>
+                </label>
+                <label class="search-time-label">
+                    End before
+                    <select id="time-end" class="search-time-select">
+                        <option value="">Any time</option>
+                    </select>
+                </label>
+            </div>
+        </div>
+
+        <div class="search-adv-section search-adv-actions">
+            <button type="button" class="search-adv-clear-btn" id="adv-clear">Clear advanced filters</button>
+        </div>
+    </div>
+
     {% if no_pool %}
     <div class="search-empty-panel">
         <p>No courses are loaded in the catalog yet.</p>
@@ -49,7 +101,11 @@
                 {% set td = course.term_description or '' %}
                 {% set term_key = 'fall' if 'Fall' in td else ('spring' if 'Spring' in td else 'other') %}
                 {% set search_blob = ((course.course_number or '') ~ ' ' ~ (course.course_title or '') ~ ' ' ~ (course.instructor_name or ''))|lower %}
-                <tr class="search-result-row" data-search="{{ search_blob|e }}" data-term="{{ term_key }}">
+                {% set sched = schedule_data.get(course.id, {}) %}
+                <tr class="search-result-row" data-search="{{ search_blob|e }}" data-term="{{ term_key }}"
+                    data-days="{{ sched.get('days', '') }}"
+                    data-start-min="{{ sched.get('start_min', '') }}"
+                    data-end-min="{{ sched.get('end_min', '') }}">
                     <td class="search-col-num"><span class="search-row-accent" aria-hidden="true"></span>{{ course.course_number or "—" }}</td>
                     <td class="search-col-title">{{ course.course_title or "—" }}</td>
                     <td class="search-col-inst">{{ course.instructor_name or "TBA" }}</td>
@@ -99,16 +155,148 @@
     var rows = root.querySelectorAll('tr.search-result-row');
     var total = rows.length;
 
+    var advToggle = document.getElementById('adv-toggle');
+    var advPanel = document.getElementById('adv-panel');
+    var dayBtns = root.querySelectorAll('.search-day-btn');
+    var presetBtns = root.querySelectorAll('.search-preset-btn');
+    var timeStart = document.getElementById('time-start');
+    var timeEnd = document.getElementById('time-end');
+    var advClear = document.getElementById('adv-clear');
+
+    var activeDays = new Set();
+    var activePreset = null;
+
+    function populateTimeSelects() {
+        var times = [
+            [480,'8:00am'],[510,'8:30am'],[540,'9:00am'],[570,'9:30am'],
+            [600,'10:00am'],[630,'10:30am'],[660,'11:00am'],[690,'11:30am'],
+            [720,'12:00pm'],[750,'12:30pm'],[780,'1:00pm'],[810,'1:30pm'],
+            [840,'2:00pm'],[870,'2:30pm'],[900,'3:00pm'],[930,'3:30pm'],
+            [960,'4:00pm'],[990,'4:30pm'],[1020,'5:00pm'],[1050,'5:30pm'],
+            [1080,'6:00pm'],[1110,'6:30pm'],[1140,'7:00pm'],[1170,'7:30pm'],
+            [1200,'8:00pm'],[1230,'8:30pm'],[1260,'9:00pm'],[1290,'9:30pm'],
+            [1320,'10:00pm']
+        ];
+        times.forEach(function(t) {
+            var o1 = document.createElement('option');
+            o1.value = t[0]; o1.textContent = t[1];
+            timeStart.appendChild(o1);
+            var o2 = document.createElement('option');
+            o2.value = t[0]; o2.textContent = t[1];
+            timeEnd.appendChild(o2);
+        });
+    }
+    populateTimeSelects();
+
+    if (advToggle && advPanel) {
+        advToggle.addEventListener('click', function() {
+            var open = advPanel.hidden;
+            advPanel.hidden = !open;
+            advToggle.setAttribute('aria-expanded', open);
+            advToggle.classList.toggle('search-adv-toggle--open', open);
+        });
+    }
+
+    dayBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var day = btn.dataset.day;
+            if (activeDays.has(day)) {
+                activeDays.delete(day);
+                btn.classList.remove('active');
+            } else {
+                activeDays.add(day);
+                btn.classList.add('active');
+            }
+            applyFilters();
+        });
+    });
+
+    presetBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var s = parseInt(btn.dataset.start, 10);
+            var e = parseInt(btn.dataset.end, 10);
+            if (btn.classList.contains('active')) {
+                btn.classList.remove('active');
+                activePreset = null;
+                timeStart.value = '';
+                timeEnd.value = '';
+            } else {
+                presetBtns.forEach(function(b) { b.classList.remove('active'); });
+                btn.classList.add('active');
+                activePreset = btn;
+                timeStart.value = s;
+                timeEnd.value = e;
+            }
+            applyFilters();
+        });
+    });
+
+    function syncPresetHighlight() {
+        var sv = timeStart.value, ev = timeEnd.value;
+        presetBtns.forEach(function(btn) {
+            var match = sv && ev && btn.dataset.start === sv && btn.dataset.end === ev;
+            btn.classList.toggle('active', match);
+        });
+    }
+
+    if (timeStart) timeStart.addEventListener('change', function() { syncPresetHighlight(); applyFilters(); });
+    if (timeEnd) timeEnd.addEventListener('change', function() { syncPresetHighlight(); applyFilters(); });
+
+    function clearAdvanced() {
+        activeDays.clear();
+        dayBtns.forEach(function(b) { b.classList.remove('active'); });
+        presetBtns.forEach(function(b) { b.classList.remove('active'); });
+        activePreset = null;
+        if (timeStart) timeStart.value = '';
+        if (timeEnd) timeEnd.value = '';
+        applyFilters();
+    }
+
+    if (advClear) advClear.addEventListener('click', clearAdvanced);
+
     function applyFilters() {
         var q = (input && input.value || '').trim().toLowerCase();
         var term = termSel ? termSel.value : 'any';
+        var filterStart = timeStart && timeStart.value ? parseInt(timeStart.value, 10) : null;
+        var filterEnd = timeEnd && timeEnd.value ? parseInt(timeEnd.value, 10) : null;
+        var filterDays = activeDays.size > 0;
+
         var visible = 0;
         rows.forEach(function (row) {
             var blob = (row.getAttribute('data-search') || '').toLowerCase();
             var rowTerm = row.getAttribute('data-term') || 'other';
             var okQ = !q || blob.indexOf(q) !== -1;
             var okT = term === 'any' || rowTerm === term;
-            var show = okQ && okT;
+
+            var okDay = true;
+            if (filterDays) {
+                var rowDays = row.getAttribute('data-days') || '';
+                if (!rowDays) {
+                    okDay = false;
+                } else {
+                    var rd = rowDays.split(',');
+                    okDay = false;
+                    activeDays.forEach(function(d) {
+                        if (rd.indexOf(d) !== -1) okDay = true;
+                    });
+                }
+            }
+
+            var okTime = true;
+            if (filterStart !== null || filterEnd !== null) {
+                var rs = row.getAttribute('data-start-min');
+                var re = row.getAttribute('data-end-min');
+                if (!rs || !re) {
+                    okTime = false;
+                } else {
+                    var rowStart = parseInt(rs, 10);
+                    var rowEnd = parseInt(re, 10);
+                    if (filterStart !== null && rowStart < filterStart) okTime = false;
+                    if (filterEnd !== null && rowEnd > filterEnd) okTime = false;
+                }
+            }
+
+            var show = okQ && okT && okDay && okTime;
             row.hidden = !show;
             if (show) visible++;
         });
@@ -126,7 +314,7 @@
         clearBtn.addEventListener('click', function () {
             if (input) input.value = '';
             if (termSel) termSel.value = 'any';
-            applyFilters();
+            clearAdvanced();
             if (input) input.focus();
         });
     }

@@ -15,9 +15,16 @@
                 </label>
                 <hr class="calendar-sidebar-divider" aria-hidden="true">
                 {% for c in scheduled_courses %}
-                <label class="calendar-check-row">
+                <label class="calendar-check-row" data-course-title="{{ c.course_title or '' }}">
                     <input type="checkbox" class="calendar-checkbox cal-class-toggle" data-course-id="{{ c.id }}" {% if c.id not in hidden_ids %}checked{% endif %}>
-                    <span>{{ c.course_number or "Course" }}</span>
+                    <span class="calendar-check-label">
+                        {{ c.course_number or "Course" }}
+                        {% if course_pref_map.get(c.id) == 'star' %}
+                        <span class="cal-pref-icon cal-pref-star">★</span>
+                        {% elif course_pref_map.get(c.id) == 'heart' %}
+                        <span class="cal-pref-icon cal-pref-heart">♥</span>
+                        {% endif %}
+                    </span>
                 </label>
                 {% endfor %}
                 {% else %}
@@ -29,8 +36,15 @@
                 {% if tba_courses %}
                 <ul class="calendar-course-list calendar-course-list--tba">
                     {% for c in tba_courses %}
-                    <li class="calendar-course-line">
-                        <span class="calendar-course-code">{{ c.course_number or "Course" }}</span>
+                    <li class="calendar-course-line" data-course-title="{{ c.course_title or '' }}">
+                        <span class="calendar-course-code">
+                            {{ c.course_number or "Course" }}
+                            {% if course_pref_map.get(c.id) == 'star' %}
+                            <span class="cal-pref-icon cal-pref-star">★</span>
+                            {% elif course_pref_map.get(c.id) == 'heart' %}
+                            <span class="cal-pref-icon cal-pref-heart">♥</span>
+                            {% endif %}
+                        </span>
                         {% if c.meetings_display %}
                         <span class="calendar-course-meta">{{ c.meetings_display[:60] }}{% if c.meetings_display|length > 60 %}…{% endif %}</span>
                         {% else %}
@@ -65,10 +79,13 @@
                     <div class="calendar-day-col">
                         <div class="calendar-day-grid">
                             {% for ev in positioned_by_day[day_idx] %}
-                            <div class="cal-event cal-event--c{{ ev.color_idx }} cal-event-block"
+                            <div class="cal-event cal-event--c{{ ev.color_idx }} cal-event-block{% if ev.hidden %} cal-event--hidden{% endif %}"
                                  style="top: {{ ev.top }}%; height: {{ ev.height }}%; left: {{ ev.left }}%; width: {{ ev.width }}%;"
                                  data-course-id="{{ ev.course_id }}"
-                                 title="{{ ev.title }}">{{ ev.label }}</div>
+                                 data-start-min="{{ ev.start_min }}"
+                                 data-end-min="{{ ev.end_min }}"
+                                 data-course-title="{{ ev.course_number }}: {{ ev.title }}"
+                                 aria-label="{{ ev.title }}">{{ ev.label }}</div>
                             {% endfor %}
                         </div>
                     </div>
@@ -77,6 +94,7 @@
             </div>
         </div>
     </div>
+    <div id="cal-tooltip" class="cal-tooltip"></div>
 </div>
 
 {% if scheduled_courses %}
@@ -88,14 +106,75 @@
     var singleUrl = root.getAttribute('data-cal-url');
     var master = document.getElementById('cal-select-all');
     var toggles = document.querySelectorAll('.cal-class-toggle');
-    var blocks = document.querySelectorAll('.cal-event-block');
+    var GAP = 1.0;
 
     function setBlocksVisible(courseId, visible) {
         var id = String(courseId);
-        blocks.forEach(function (el) {
+        document.querySelectorAll('.cal-event-block').forEach(function (el) {
             if (el.getAttribute('data-course-id') === id) {
                 el.classList.toggle('cal-event--hidden', !visible);
             }
+        });
+    }
+
+    function recalcLayout() {
+        document.querySelectorAll('.calendar-day-grid').forEach(function(grid) {
+            var allBlocks = grid.querySelectorAll('.cal-event-block');
+            var visible = [];
+            allBlocks.forEach(function(block) {
+                if (!block.classList.contains('cal-event--hidden')) {
+                    visible.push({
+                        el: block,
+                        s: parseInt(block.dataset.startMin, 10),
+                        e: parseInt(block.dataset.endMin, 10)
+                    });
+                }
+            });
+            if (!visible.length) return;
+
+            visible.sort(function(a, b) { return a.s - b.s || a.e - b.e; });
+
+            var lanesEnd = [];
+            visible.forEach(function(ev) {
+                var lane = -1;
+                for (var i = 0; i < lanesEnd.length; i++) {
+                    if (lanesEnd[i] <= ev.s) {
+                        lane = i;
+                        lanesEnd[i] = ev.e;
+                        break;
+                    }
+                }
+                if (lane === -1) {
+                    lane = lanesEnd.length;
+                    lanesEnd.push(ev.e);
+                }
+                ev.lane = lane;
+            });
+
+            visible.forEach(function(ev) {
+                var best = 1;
+                visible.forEach(function(check) {
+                    var t = check.s;
+                    if (t >= ev.s && t < ev.e) {
+                        var count = 0;
+                        visible.forEach(function(o) {
+                            if (o.s <= t && t < o.e) count++;
+                        });
+                        best = Math.max(best, count);
+                    }
+                });
+                ev.lc = Math.max(best, 1);
+                if (ev.lc === 1) ev.lane = 0;
+            });
+
+            visible.forEach(function(ev) {
+                var lc = Math.max(ev.lc, 1);
+                var usable = 100 - GAP * (lc + 1);
+                var w = usable / lc;
+                var left = GAP + ev.lane * (w + GAP);
+                ev.el.style.left = left.toFixed(4) + '%';
+                ev.el.style.width = w.toFixed(4) + '%';
+            });
         });
     }
 
@@ -119,6 +198,7 @@
             var id = parseInt(cb.getAttribute('data-course-id'), 10);
             var vis = cb.checked;
             setBlocksVisible(id, vis);
+            recalcLayout();
             syncMaster();
             postJSON(singleUrl, { course_id: id, visible: vis });
         });
@@ -133,11 +213,50 @@
                 ids.push(parseInt(cb.getAttribute('data-course-id'), 10));
                 setBlocksVisible(cb.getAttribute('data-course-id'), vis);
             });
+            recalcLayout();
             if (ids.length && batchUrl) {
                 postJSON(batchUrl, { course_ids: ids, visible: vis });
             }
         });
     }
+
+    var tooltip = document.getElementById('cal-tooltip');
+    var tooltipEl = null;
+
+    function positionTooltip(e) {
+        var x = e.clientX + 12;
+        var y = e.clientY + 12;
+        var tw = tooltip.offsetWidth;
+        var th = tooltip.offsetHeight;
+        if (x + tw > window.innerWidth - 8) x = e.clientX - tw - 8;
+        if (y + th > window.innerHeight - 8) y = e.clientY - th - 8;
+        tooltip.style.left = x + 'px';
+        tooltip.style.top = y + 'px';
+    }
+
+    root.addEventListener('mouseover', function(e) {
+        var target = e.target.closest('[data-course-title]');
+        if (target && target.dataset.courseTitle) {
+            if (tooltipEl !== target) {
+                tooltipEl = target;
+                tooltip.textContent = target.dataset.courseTitle;
+                tooltip.classList.add('visible');
+            }
+            positionTooltip(e);
+        } else if (tooltipEl) {
+            tooltip.classList.remove('visible');
+            tooltipEl = null;
+        }
+    });
+
+    root.addEventListener('mousemove', function(e) {
+        if (tooltipEl) positionTooltip(e);
+    });
+
+    root.addEventListener('mouseleave', function() {
+        tooltip.classList.remove('visible');
+        tooltipEl = null;
+    });
 })();
 </script>
 {% endif %}

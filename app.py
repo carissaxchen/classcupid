@@ -968,11 +968,23 @@ def search():
         for k, v in _course_prefs().items()
         if v in ("heart", "star")
     }
+    schedule_data = {}
+    for c in courses:
+        st = parse_clock_to_minutes(c.start_time)
+        et = parse_clock_to_minutes(c.end_time)
+        days = ",".join(sorted(c._get_days_set() & {"M", "T", "W", "Th", "F", "S"},
+                                key=lambda d: ("M", "T", "W", "Th", "F", "S").index(d)))
+        schedule_data[c.id] = {
+            "start_min": st if st is not None else "",
+            "end_min": et if et is not None else "",
+            "days": days,
+        }
     return render_template(
         "search.html",
         courses=courses,
         saved_ids=saved_ids,
         no_pool=len(courses) == 0,
+        schedule_data=schedule_data,
     )
 
 
@@ -1189,6 +1201,7 @@ def _expand_course_events(course, color_idx):
     et = parse_clock_to_minutes(course.end_time)
     label = _calendar_short_label(course)
     title = (course.course_title or "")[:120]
+    course_number = course.course_number or ""
     out = []
     for d in CALENDAR_DAY_ORDER:
         if d not in course._get_days_set():
@@ -1203,6 +1216,7 @@ def _expand_course_events(course, color_idx):
                 "label": label,
                 "title": title,
                 "color_idx": color_idx % 12,
+                "course_number": course_number,
             }
         )
     return out
@@ -1257,8 +1271,6 @@ def _build_calendar_payload(saved_courses, hidden_ids):
 
     raw_events = []
     for c in scheduled_courses:
-        if c.id in hidden_ids:
-            continue
         raw_events.extend(_expand_course_events(c, color_by_id[c.id]))
 
     by_day = [[] for _ in range(CALENDAR_NUM_DAYS)]
@@ -1266,7 +1278,12 @@ def _build_calendar_payload(saved_courses, hidden_ids):
         by_day[e["day_idx"]].append(e)
 
     for d_events in by_day:
-        _assign_event_lanes(d_events)
+        visible = [e for e in d_events if e["course_id"] not in hidden_ids]
+        _assign_event_lanes(visible)
+        for e in d_events:
+            if "lane" not in e:
+                e["lane"] = 0
+                e["lane_count"] = 1
 
     range_start = 9 * 60
     range_end = CALENDAR_MIN_RANGE_END_MIN
@@ -1314,6 +1331,10 @@ def _build_calendar_payload(saved_courses, hidden_ids):
                     "height": round(max(height, 0.8), 4),
                     "left": round(left, 4),
                     "width": round(w, 4),
+                    "start_min": e["start_min"],
+                    "end_min": e["end_min"],
+                    "course_number": e["course_number"],
+                    "hidden": e["course_id"] in hidden_ids,
                 }
             )
 
@@ -1357,6 +1378,14 @@ def calendar():
     ctx["all_scheduled_visible"] = bool(ctx["scheduled_courses"]) and all(
         c.id not in hidden_ids for c in ctx["scheduled_courses"]
     )
+    course_pref_map = {}
+    for cid_str, status in prefs.items():
+        if status in ("heart", "star"):
+            try:
+                course_pref_map[int(cid_str)] = status
+            except (TypeError, ValueError):
+                pass
+    ctx["course_pref_map"] = course_pref_map
     return render_template("calendar.html", **ctx)
 
 
