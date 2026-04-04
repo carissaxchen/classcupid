@@ -21,10 +21,12 @@ body {
     font-size: 1.1rem;
     color: var(--black);
     line-height: 1.6;
-    background-image: url("../images/ccbackground.jpg");
-    background-repeat: repeat;
+    background-color: #fff;
+    background-image: url("../images/page-background.png");
+    background-repeat: no-repeat;
     background-attachment: fixed;
-    background-size: auto;
+    background-position: center center;
+    background-size: cover;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -307,15 +309,17 @@ body {
     display: flex;
     flex: 1;
     min-height: var(--cal-axis-px, 448px);
+    align-items: stretch;
 }
 
 .calendar-time-axis {
     width: 56px;
     flex-shrink: 0;
-    height: var(--cal-axis-px, 448px);
+    min-height: var(--cal-axis-px, 448px);
     display: flex;
     flex-direction: column;
     border-right: 1px solid #e0e0e0;
+    align-self: stretch;
 }
 
 .calendar-time-slot {
@@ -336,8 +340,10 @@ body {
     flex: 1;
     display: grid;
     grid-template-columns: repeat(10, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr);
     min-width: 0;
-    height: var(--cal-axis-px, 448px);
+    min-height: var(--cal-axis-px, 448px);
+    align-self: stretch;
 }
 
 .calendar-columns--week {

@@ -1093,6 +1093,10 @@ def matches():
 CALENDAR_DAY_ORDER = ("M", "T", "W", "Th", "F", "S")
 CALENDAR_DAY_LABELS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
 CALENDAR_NUM_DAYS = len(CALENDAR_DAY_ORDER)
+# FAS listings often run into the evening (e.g. 7:15–9:45 PM); saved courses drive the top of the window.
+CALENDAR_LATEST_END_MIN = 22 * 60
+# If everything ends by mid-afternoon, still draw the grid through early evening (hour rows through ~8 PM).
+CALENDAR_MIN_RANGE_END_MIN = 20 * 60
 
 _SUBJ_ABBR = {
     "COMPSCI": "CS",
@@ -1226,12 +1230,16 @@ def _build_calendar_payload(saved_courses, hidden_ids):
         _assign_event_lanes(d_events)
 
     range_start = 9 * 60
-    range_end = 17 * 60
+    range_end = CALENDAR_MIN_RANGE_END_MIN
     if raw_events:
         mn = min(ev["start_min"] for ev in raw_events)
         mx = max(ev["end_min"] for ev in raw_events)
         range_start = max(7 * 60, (mn // 60 - 1) * 60)
-        range_end = min(22 * 60, ((mx + 59) // 60 + 1) * 60)
+        range_end = min(
+            CALENDAR_LATEST_END_MIN,
+            ((mx + 59) // 60 + 1) * 60,
+        )
+        range_end = max(range_end, CALENDAR_MIN_RANGE_END_MIN)
         if range_end <= range_start:
             range_end = range_start + 8 * 60
 
