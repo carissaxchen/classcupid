@@ -1,25 +1,20 @@
 {
-  "buildCommand": "pip install -r requirements.txt && python3 scripts/build_catalog.py",
-  "builds": [
-    {
-      "src": "api/index.py",
-      "use": "@vercel/python",
-      "config": {
-        "includeFiles": [
-          "app.py",
-          "models.py",
-          "helpers.py",
-          "catalog.db",
-          "templates/**",
-          "static/**",
-          "data/json/harvard_college_concentrations.json",
-          "data/json/harvard_schools.json",
-          "data/json/*_Geneds.json"
-        ]
-      }
+  "buildCommand": "pip install -r requirements.txt && python3 scripts/build_catalog.py && mkdir -p public && cp -r static public/static",
+  "functions": {
+    "api/index.py": {
+      "includeFiles": [
+        "app.py",
+        "models.py",
+        "helpers.py",
+        "catalog.db",
+        "templates/**",
+        "data/json/harvard_college_concentrations.json",
+        "data/json/harvard_schools.json",
+        "data/json/*_Geneds.json"
+      ]
     }
-  ],
-  "routes": [
-    { "src": "/(.*)", "dest": "/api/index.py" }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index.py" }
   ]
 }

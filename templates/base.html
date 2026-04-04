@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Class Cupid{% endblock %}</title>
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/Class Cupid Logo V3-3.png') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/class-cupid-logo-v3.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -12,9 +12,9 @@
         <div class="nav-container">
             <div class="nav-logo">
                 <a href="{{ url_for('discover') if profile and profile.get('affiliation') else url_for('profile') }}" class="logo-link">
-                    <img src="{{ url_for('static', filename='images/Class Cupid Logo V3-3.png') }}" alt="Class Cupid" class="logo-image">
+                    <img src="{{ url_for('static', filename='images/class-cupid-logo-v3.png') }}" alt="Class Cupid" class="logo-image">
                 </a>
-                <img src="{{ url_for('static', filename='images/Class Cupid Text-4.png') }}" alt="Class Cupid" class="logo-text-image">
+                <img src="{{ url_for('static', filename='images/class-cupid-text.png') }}" alt="Class Cupid" class="logo-text-image">
             </div>
             <div class="nav-links">
                 <a href="{{ url_for('discover') }}" class="nav-link{% if request.endpoint == 'discover' %} nav-link-active{% endif %}">
@@ -68,7 +68,7 @@
                 <p>Course metadata © 2026-2027 President and Fellows of Harvard College</p>
             </div>
             <div class="footer-logo-container">
-                <img src="{{ url_for('static', filename='images/Class Cupid Logo.png') }}" alt="Class Cupid" class="footer-logo">
+                <img src="{{ url_for('static', filename='images/class-cupid-logo.png') }}" alt="Class Cupid" class="footer-logo">
             </div>
         </div>
     </footer>

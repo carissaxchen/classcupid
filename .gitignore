@@ -46,6 +46,9 @@ flask_session/
 .DS_Store
 Thumbs.db
 
+# Vercel build output
+public/
+
 # User uploads or generated content
 Users/
 
