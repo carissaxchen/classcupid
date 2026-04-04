@@ -30,6 +30,10 @@
                     <img src="{{ url_for('static', filename='images/icons/calendar.svg') }}" alt="" class="nav-icon">
                     <span>Calendar</span>
                 </a>
+                <a href="{{ url_for('search') }}" class="nav-link{% if request.endpoint == 'search' %} nav-link-active{% endif %}">
+                    <img src="{{ url_for('static', filename='images/icons/search.svg') }}" alt="" class="nav-icon">
+                    <span>Search</span>
+                </a>
                 {% endif %}
             </div>
             <div class="nav-auth">
